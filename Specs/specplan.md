@@ -79,3 +79,30 @@ harold@Harold:/mnt/c/repos/Membrio$ opencode -s ses_eb4516ec1ffe4aeomg0Ta8oZg1
   Continue  opencode -s ses_eb4516ec1ffe4aeomg0Ta8oZg1
 
 harold@Harold:/mnt/c/repos/Membrio$ 
+
+Fase 1 (datos) — lista para tu revisión
+Qué generé
+Archivo	Qué es
+src/server/db/schema.ts	Fuente de verdad: 10 tablas, FKs compuestas (id, organizacion_id), CHECKs (tipo_documento, tipo_sangre, concepto, estado, descuento 0–1, día 1, documento solo dígitos), índice único parcial de acudiente principal
+drizzle/0000_*.sql	Migración generada — todo lo generó Drizzle, no hizo falta migración personalizada (el FK a auth.users quedó comentado en el schema para cuando usemos Supabase)
+scripts/seed.ts	Seed atómico (una transacción: o aplica completo o no deja nada): Truchas, roles, 5 EPS, Básico/Pro (matrícula 74000), 10 categorías, 2 usuarios, 5 afiliados, ~38 pagos (1 pendiente multimes de 3 meses para probar verificación)
+scripts/verify.ts	20 verificaciones: 9 conteos + 7 CHECKs + 3 únicos + 1 FK cross-tenant, cada probe en su propia transacción con rollback
+membrio_schema.sql	Derivado de las migraciones (pnpm db:schema-sql), solo referencia
+src/server/db/client.ts	postgres con prepare: false, max: 3; toma DATABASE_URL del entorno — no hay ningún string de conexión en el repo
+Dos bugs que encontré y corregí (por si te aparecen después)
+1. foreignKey() de Drizzle usa foreignColumns, no references — con references el generate revienta.
+2. drizzle-kit emite los FOREIGN KEY antes que los CREATE UNIQUE INDEX: los destinos de las FKs compuestas ahora son unique() (constraint dentro del CREATE TABLE), no uniqueIndex.
+⚠️ Un bloqueo: .env.example
+Tu config global de OpenCode tiene deny para **/.env.*, así que no puedo escribirlo. Crealo vos con este contenido exacto:
+# Copiar a .env y completar localmente. Nunca commitear .env.
+# La base es Postgres local.
+DATABASE_URL=
+Cómo verificar la Fase 1
+pnpm install
+# crear .env (arriba) y completar DATABASE_URL con tu Postgres local
+pnpm db:migrate      # aplica la migración
+pnpm db:seed         # Truchas demo (idempotente, transacción única)
+pnpm db:verify       # espera: 20/20 verificaciones OK
+pnpm typecheck       # ya pasa acá
+No corrí migrate/seed/verify contra una base porque eso exigiría que yo invente un connection string, que es justo lo que me pediste evitar — la validación contra Postgres queda de tu lado con el comando de arriba.
+Si db:verify marca algún FAIL, pegame la salida y lo ajusto. Si sale 20/20, arranco con la Fase 2 (entorno, auth dev-login y errores). ¿Commiteo la Fase 1 antes de seguir?
