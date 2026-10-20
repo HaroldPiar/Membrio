@@ -57,3 +57,25 @@ Con `@hono/zod-openapi`: los esquemas Zod de `src/shared` definen validación Y 
 README con pasos: instalar, crear `.env`, correr migraciones, `seed`, levantar el servidor, abrir `/api/v1/docs`, hacer dev-login y ejecutar un flujo completo (crear afiliado, registrar pago de 3 meses, verificarlo y ver el dashboard).
 
 Empieza solo por la Fase 1 y detente para revisión.
+
+
+harold@Harold:/mnt/c/repos/Membrio$ opencode
+Starting background server...
+                                   ▄     
+  █▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+  █  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀
+  ▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
+
+  Session   Session init and setup
+  Continue  opencode -s ses_eb4516ec1ffe4aeomg0Ta8oZg1
+
+harold@Harold:/mnt/c/repos/Membrio$ opencode -s ses_eb4516ec1ffe4aeomg0Ta8oZg1
+                                   ▄     
+  █▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+  █  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀
+  ▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
+
+  Session   Session init and setup
+  Continue  opencode -s ses_eb4516ec1ffe4aeomg0Ta8oZg1
+
+harold@Harold:/mnt/c/repos/Membrio$ 
