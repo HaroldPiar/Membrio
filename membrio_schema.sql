@@ -1,0 +1,132 @@
+-- memmrio_schema.sql — REFERENCIA DERIVADA (generado con `pnpm db:schema-sql`)
+-- NO editar a mano ni usar para migrar.
+-- Fuente de verdad: src/server/db/schema.ts · Migraciones: drizzle/
+-- Futuro Supabase Auth: usuarios.id pasará a referenciar auth.users(id)
+-- (agregar en una migración personalizada; ver comentario en schema.ts).
+
+CREATE TABLE "acudientes" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"afiliado_id" uuid NOT NULL,
+	"numero_documento" text NOT NULL,
+	"nombre" text NOT NULL,
+	"celular" text,
+	"correo" text,
+	"es_principal" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "acudientes_numero_documento_digits_check" CHECK ("acudientes"."numero_documento" ~ '^[0-9]+$')
+);
+CREATE TABLE "afiliados" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"plan_id" uuid NOT NULL,
+	"categoria_id" uuid NOT NULL,
+	"tipo_documento" text NOT NULL,
+	"numero_documento" text NOT NULL,
+	"nombre" text NOT NULL,
+	"celular" text NOT NULL,
+	"correo" text NOT NULL,
+	"eps_id" uuid,
+	"tipo_sangre" text NOT NULL,
+	"fecha_nacimiento" date NOT NULL,
+	"genero" text,
+	"medio_captacion" text,
+	"direccion" text,
+	"descuento" numeric(5, 4) DEFAULT '0' NOT NULL,
+	"fecha_ingreso" date NOT NULL,
+	"fecha_retiro" date,
+	"motivo_retiro" text,
+	"activo" boolean DEFAULT true NOT NULL,
+	"fecha_consentimiento" date,
+	"url_documentos" text[],
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "afiliados_org_id_unique" UNIQUE("organizacion_id","id"),
+	CONSTRAINT "afiliados_tipo_documento_check" CHECK ("afiliados"."tipo_documento" in ('TI', 'CC', 'RC', 'PAS', 'PPT')),
+	CONSTRAINT "afiliados_numero_documento_digits_check" CHECK ("afiliados"."numero_documento" ~ '^[0-9]+$'),
+	CONSTRAINT "afiliados_tipo_sangre_check" CHECK ("afiliados"."tipo_sangre" in ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+	CONSTRAINT "afiliados_descuento_check" CHECK ("afiliados"."descuento" >= 0 and "afiliados"."descuento" <= 1)
+);
+CREATE TABLE "categorias" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"nombre" text NOT NULL,
+	"activa" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "categorias_org_id_unique" UNIQUE("organizacion_id","id")
+);
+CREATE TABLE "eps" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"nombre" text NOT NULL,
+	"activa" boolean DEFAULT true NOT NULL,
+	CONSTRAINT "eps_nombre_unique" UNIQUE("nombre")
+);
+CREATE TABLE "organizaciones" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"nombre" text NOT NULL,
+	"slug" text NOT NULL,
+	"activa" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "organizaciones_slug_unique" UNIQUE("slug")
+);
+CREATE TABLE "pago_detalle" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"pago_id" uuid NOT NULL,
+	"afiliado_id" uuid NOT NULL,
+	"concepto" text NOT NULL,
+	"fecha_cobertura" date NOT NULL,
+	"monto" numeric(12, 2) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "pago_detalle_concepto_check" CHECK ("pago_detalle"."concepto" in ('mensualidad', 'matricula')),
+	CONSTRAINT "pago_detalle_dia_uno_check" CHECK (extract(day from "pago_detalle"."fecha_cobertura") = 1)
+);
+CREATE TABLE "pagos" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"monto_total" numeric(12, 2) NOT NULL,
+	"estado" text DEFAULT 'pendiente' NOT NULL,
+	"factura_documento" text NOT NULL,
+	"factura_nombre" text NOT NULL,
+	"factura_celular" text,
+	"factura_correo" text,
+	"observaciones" text,
+	"url_comprobante" text,
+	"revisado_por" uuid,
+	"revisado_en" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "pagos_org_id_unique" UNIQUE("organizacion_id","id"),
+	CONSTRAINT "pagos_estado_check" CHECK ("pagos"."estado" in ('pendiente', 'verificado', 'rechazado'))
+);
+CREATE TABLE "planes" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"nombre" text NOT NULL,
+	"valor_mensualidad" numeric(12, 2) NOT NULL,
+	"valor_matricula" numeric(12, 2) NOT NULL,
+	"activo" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "planes_org_id_unique" UNIQUE("organizacion_id","id")
+);
+CREATE TABLE "roles" (
+	"id" smallint PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY (sequence name "roles_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 32767 START WITH 1 CACHE 1),
+	"nombre" text NOT NULL,
+	CONSTRAINT "roles_nombre_unique" UNIQUE("nombre")
+);
+CREATE TABLE "usuarios" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organizacion_id" uuid NOT NULL,
+	"rol_id" smallint NOT NULL,
+	"correo" text NOT NULL,
+	"nombre" text NOT NULL,
+	"activo" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "usuarios_correo_unique" UNIQUE("correo")
+);
+CREATE INDEX "usuarios_org_idx" ON "usuarios" USING btree ("organizacion_id");

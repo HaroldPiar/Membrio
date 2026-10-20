@@ -93,7 +93,7 @@ La hoja de calculo contiene las siguiente columnas:
     - Sede 6
     - Día 6
     - Hora 6
-    - Cedula del acuciente para factura electrónica
+    - Cedula del acudiente para factura electrónica
     - Encargado
     - Dirección
     - Carta responsabilidad
