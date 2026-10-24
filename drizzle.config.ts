@@ -1,4 +1,5 @@
 import { defineConfig } from 'drizzle-kit';
+import 'dotenv/config';
 
 // Carga .env si existe; para `db:generate` no hace falta base conectada.
 try {

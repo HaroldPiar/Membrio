@@ -33,6 +33,16 @@ function registrar(nombre: string, ok: boolean, detalle?: string): void {
 
 type ErrorConCodigo = Error & { code?: string };
 
+/** Busca el código SQLSTATE recorriendo la cadena de `cause` (Drizzle envuelve el error del driver). */
+function pgCode(err: unknown): string | undefined {
+  let e = err as { code?: unknown; cause?: unknown } | undefined;
+  for (let i = 0; i < 5 && e; i++) {
+    if (typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code)) return e.code;
+    e = e.cause as typeof e;
+  }
+  return undefined;
+}
+
 /** Ejecuta `fn` en una transacción que SIEMPRE hace rollback. */
 async function enTransaccion(fn: (tx: typeof db) => unknown): Promise<void> {
   try {
@@ -51,7 +61,7 @@ async function esperaError(codigoEsperado: string, nombre: string, fn: () => unk
     await fn();
     registrar(nombre, false, `falló: se esperaba error ${codigoEsperado} y la operación SUCEDIÓ`);
   } catch (err) {
-    const codigo = (err as ErrorConCodigo).code;
+    const codigo = pgCode(err);
     if (codigo === codigoEsperado) {
       registrar(nombre, true);
     } else {

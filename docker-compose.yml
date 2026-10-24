@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: membrio_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "0000"
+      POSTGRES_DB: membrio_prueba
+    ports:
+      - "5433:5432"
+    volumes:
+      - membrio_pgdata:/var/lib/postgresql/data
+
+volumes:
+  membrio_pgdata:
