@@ -18,8 +18,11 @@ const journal = JSON.parse(readFileSync(join(raiz, 'drizzle', 'meta', '_journal.
 const sql = journal.entries
   .map((e) => readFileSync(join(raiz, 'drizzle', `${e.tag}.sql`), 'utf8'))
   .join('\n')
+  // El separador puede venir al final de la línea del statement (migraciones cortas):
+  // reemplazarlo por salto y descartar solo líneas vacías, sin tocar el SQL.
+  .replaceAll('--> statement-breakpoint', '\n')
   .split('\n')
-  .filter((linea) => !linea.includes('--> statement-breakpoint'))
+  .filter((linea) => linea.trim().length > 0)
   .join('\n')
   .trim();
 

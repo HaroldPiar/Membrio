@@ -129,4 +129,36 @@ CREATE TABLE "usuarios" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "usuarios_correo_unique" UNIQUE("correo")
 );
+ALTER TABLE "acudientes" ADD CONSTRAINT "acudientes_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "acudientes" ADD CONSTRAINT "acudientes_afiliado_fk" FOREIGN KEY ("afiliado_id","organizacion_id") REFERENCES "public"."afiliados"("id","organizacion_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_eps_id_eps_id_fk" FOREIGN KEY ("eps_id") REFERENCES "public"."eps"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_plan_fk" FOREIGN KEY ("plan_id","organizacion_id") REFERENCES "public"."planes"("id","organizacion_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_categoria_fk" FOREIGN KEY ("categoria_id","organizacion_id") REFERENCES "public"."categorias"("id","organizacion_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "categorias" ADD CONSTRAINT "categorias_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "pago_detalle" ADD CONSTRAINT "pago_detalle_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "pago_detalle" ADD CONSTRAINT "pago_detalle_pago_fk" FOREIGN KEY ("pago_id","organizacion_id") REFERENCES "public"."pagos"("id","organizacion_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "pago_detalle" ADD CONSTRAINT "pago_detalle_afiliado_fk" FOREIGN KEY ("afiliado_id","organizacion_id") REFERENCES "public"."afiliados"("id","organizacion_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "pagos" ADD CONSTRAINT "pagos_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "pagos" ADD CONSTRAINT "pagos_revisado_por_usuarios_id_fk" FOREIGN KEY ("revisado_por") REFERENCES "public"."usuarios"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "planes" ADD CONSTRAINT "planes_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_organizacion_id_organizaciones_id_fk" FOREIGN KEY ("organizacion_id") REFERENCES "public"."organizaciones"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_rol_id_roles_id_fk" FOREIGN KEY ("rol_id") REFERENCES "public"."roles"("id") ON DELETE no action ON UPDATE no action;
+CREATE UNIQUE INDEX "acudientes_un_principal_por_afiliado" ON "acudientes" USING btree ("afiliado_id") WHERE "acudientes"."es_principal" = true;
+CREATE INDEX "acudientes_afiliado_idx" ON "acudientes" USING btree ("afiliado_id");
+CREATE UNIQUE INDEX "afiliados_org_doc_unique" ON "afiliados" USING btree ("organizacion_id","tipo_documento","numero_documento");
+CREATE INDEX "afiliados_org_idx" ON "afiliados" USING btree ("organizacion_id");
+CREATE UNIQUE INDEX "categorias_org_nombre_unique" ON "categorias" USING btree ("organizacion_id","nombre");
+CREATE INDEX "categorias_org_idx" ON "categorias" USING btree ("organizacion_id");
+CREATE UNIQUE INDEX "pago_detalle_unica_por_mes" ON "pago_detalle" USING btree ("afiliado_id","concepto","fecha_cobertura");
+CREATE INDEX "pago_detalle_pago_idx" ON "pago_detalle" USING btree ("pago_id");
+CREATE INDEX "pago_detalle_org_fecha_idx" ON "pago_detalle" USING btree ("organizacion_id","fecha_cobertura");
+CREATE INDEX "pagos_org_idx" ON "pagos" USING btree ("organizacion_id");
+CREATE INDEX "pagos_org_estado_idx" ON "pagos" USING btree ("organizacion_id","estado");
+CREATE UNIQUE INDEX "planes_org_nombre_unique" ON "planes" USING btree ("organizacion_id","nombre");
+CREATE INDEX "planes_org_idx" ON "planes" USING btree ("organizacion_id");
 CREATE INDEX "usuarios_org_idx" ON "usuarios" USING btree ("organizacion_id");
+ALTER TABLE "acudientes" DROP CONSTRAINT "acudientes_numero_documento_digits_check";
+ALTER TABLE "afiliados" DROP CONSTRAINT "afiliados_numero_documento_digits_check";
+ALTER TABLE "acudientes" ADD CONSTRAINT "acudientes_numero_documento_format_check" CHECK ("acudientes"."numero_documento" ~ '^[A-Z0-9]+$');
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_numero_documento_format_check" CHECK ("afiliados"."numero_documento" ~ '^[A-Z0-9]+$' and ("afiliados"."tipo_documento" not in ('CC', 'TI') or "afiliados"."numero_documento" ~ '^[0-9]+$'));

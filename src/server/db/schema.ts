@@ -209,9 +209,14 @@ export const afiliados = pgTable(
       'afiliados_tipo_documento_check',
       sql`${t.tipoDocumento} in ('TI', 'CC', 'RC', 'PAS', 'PPT')`,
     ),
-    numeroDocumentoDigitsCheck: check(
-      'afiliados_numero_documento_digits_check',
-      sql`${t.numeroDocumento} ~ '^[0-9]+$'`,
+    // Formato general alfanumérico en MAYÚSCULAS (los pasaportes llevan letras).
+    // Solo dígitos cuando el tipo es CC o TI (spec §7).
+    // RC y PPT quedan flexibles hasta confirmar el formato con Truchas:
+    // si exigen solo dígitos, agregarlos a la lista ('CC', 'TI') de este CHECK.
+    // La normalización trim + mayúsculas vive en Zod: src/shared/documento.ts.
+    numeroDocumentoFormatCheck: check(
+      'afiliados_numero_documento_format_check',
+      sql`${t.numeroDocumento} ~ '^[A-Z0-9]+$' and (${t.tipoDocumento} not in ('CC', 'TI') or ${t.numeroDocumento} ~ '^[0-9]+$')`,
     ),
     tipoSangreCheck: check(
       'afiliados_tipo_sangre_check',
@@ -256,9 +261,11 @@ export const acudientes = pgTable(
       .on(t.afiliadoId)
       .where(sql`${t.esPrincipal} = true`),
     afiliadoIdx: index('acudientes_afiliado_idx').on(t.afiliadoId),
-    numeroDocumentoDigitsCheck: check(
-      'acudientes_numero_documento_digits_check',
-      sql`${t.numeroDocumento} ~ '^[0-9]+$'`,
+    // Sin tipo_documento en acudientes: formato general alfanumérico MAYÚSCULAS
+    // (mismo rango que acepta afiliados; la normalización está en src/shared/documento.ts).
+    numeroDocumentoFormatCheck: check(
+      'acudientes_numero_documento_format_check',
+      sql`${t.numeroDocumento} ~ '^[A-Z0-9]+$'`,
     ),
   }),
 );

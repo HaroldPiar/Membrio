@@ -1,0 +1,4 @@
+ALTER TABLE "acudientes" DROP CONSTRAINT "acudientes_numero_documento_digits_check";--> statement-breakpoint
+ALTER TABLE "afiliados" DROP CONSTRAINT "afiliados_numero_documento_digits_check";--> statement-breakpoint
+ALTER TABLE "acudientes" ADD CONSTRAINT "acudientes_numero_documento_format_check" CHECK ("acudientes"."numero_documento" ~ '^[A-Z0-9]+$');--> statement-breakpoint
+ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_numero_documento_format_check" CHECK ("afiliados"."numero_documento" ~ '^[A-Z0-9]+$' and ("afiliados"."tipo_documento" not in ('CC', 'TI') or "afiliados"."numero_documento" ~ '^[0-9]+$'));

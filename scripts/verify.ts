@@ -12,6 +12,7 @@
 import { eq } from 'drizzle-orm';
 
 import { db, sqlClient } from '../src/server/db/client';
+import { pgCode } from '../src/server/db/pg-error';
 import {
   acudientes,
   afiliados,
@@ -29,18 +30,6 @@ const resultados: { nombre: string; ok: boolean; detalle?: string }[] = [];
 
 function registrar(nombre: string, ok: boolean, detalle?: string): void {
   resultados.push(detalle === undefined ? { nombre, ok } : { nombre, ok, detalle });
-}
-
-type ErrorConCodigo = Error & { code?: string };
-
-/** Busca el código SQLSTATE recorriendo la cadena de `cause` (Drizzle envuelve el error del driver). */
-function pgCode(err: unknown): string | undefined {
-  let e = err as { code?: unknown; cause?: unknown } | undefined;
-  for (let i = 0; i < 5 && e; i++) {
-    if (typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code)) return e.code;
-    e = e.cause as typeof e;
-  }
-  return undefined;
 }
 
 /** Ejecuta `fn` en una transacción que SIEMPRE hace rollback. */
@@ -147,8 +136,26 @@ async function main(): Promise<void> {
   await esperaError('23514', 'CHECK tipo_documento (ZZ inválido)', () =>
     enTransaccion((tx) => tx.insert(afiliados).values({ ...afiliadoValues, tipoDocumento: 'ZZ' })),
   );
-  await esperaError('23514', 'CHECK numero_documento (solo dígitos)', () =>
+  await esperaError('23514', 'CHECK numero_documento CC (solo dígitos)', () =>
     enTransaccion((tx) => tx.insert(afiliados).values({ ...afiliadoValues, numeroDocumento: '12AB' })),
+  );
+  // Pasaportes: alfanumérico en MAYÚSCULAS se inserta; en minúsculas lo rechaza el CHECK.
+  await enTransaccion(async (tx) => {
+    try {
+      await tx
+        .insert(afiliados)
+        .values({ ...afiliadoValues, tipoDocumento: 'PAS', numeroDocumento: 'AB123456' });
+      registrar('CHECK PAS alfanumérico (AB123456) se inserta', true);
+    } catch (err) {
+      registrar(
+        'CHECK PAS alfanumérico (AB123456) se inserta',
+        false,
+        `falló con ${pgCode(err) ?? (err as Error).message}`,
+      );
+    }
+  });
+  await esperaError('23514', 'CHECK PAS en minúsculas (ab123456) rechazado', () =>
+    enTransaccion((tx) => tx.insert(afiliados).values({ ...afiliadoValues, tipoDocumento: 'PAS', numeroDocumento: 'ab123456' })),
   );
   await esperaError('23514', 'CHECK tipo_sangre (Z inválido)', () =>
     enTransaccion((tx) => tx.insert(afiliados).values({ ...afiliadoValues, tipoSangre: 'Z' })),
