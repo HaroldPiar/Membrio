@@ -315,7 +315,7 @@ async function main(): Promise<void> {
     // 5. Pagos: matrícula + mensualidades verificadas según la cobertura de cada uno
     async function crearPago(
       afiliadoId: string,
-      factura: { documento: string; nombre: string; celular: string; correo: string },
+      factura: { tipoDocumento: string; documento: string; nombre: string; celular: string; correo: string },
       lineas: { concepto: 'mensualidad' | 'matricula'; fechaCobertura: string; monto: string }[],
       estado: 'verificado' | 'pendiente',
       observaciones?: string,
@@ -327,6 +327,7 @@ async function main(): Promise<void> {
           organizacionId,
           montoTotal,
           estado,
+          facturaTipoDocumento: factura.tipoDocumento,
           facturaDocumento: factura.documento,
           facturaNombre: factura.nombre,
           facturaCelular: factura.celular,
@@ -344,14 +345,23 @@ async function main(): Promise<void> {
     for (const { id: afiliadoId, def } of afiliadosInsertados) {
       const plan = planPorNombre.get(def.plan)!;
       const esMenor = def.tipoDocumento === 'TI' && def.acudiente !== undefined;
+      // El snapshot de facturación lleva tipo de documento propio (spec §8.1):
+      // el acudiente que paga es adulto con CC; el afiliado mayor usa su propio tipo.
       const factura = esMenor
         ? {
+            tipoDocumento: 'CC',
             documento: def.acudiente!.numeroDocumento,
             nombre: def.acudiente!.nombre,
             celular: def.acudiente!.celular,
             correo: def.acudiente!.correo,
           }
-        : { documento: def.numeroDocumento, nombre: def.nombre, celular: def.celular, correo: def.correo };
+        : {
+            tipoDocumento: def.tipoDocumento,
+            documento: def.numeroDocumento,
+            nombre: def.nombre,
+            celular: def.celular,
+            correo: def.correo,
+          };
 
       // Matrícula: línea concepto 'matricula' con fecha_cobertura = 1 de enero del año (spec §8.2).
       await crearPago(afiliadoId, factura, [

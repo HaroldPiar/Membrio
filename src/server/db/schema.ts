@@ -286,6 +286,9 @@ export const pagos = pgTable(
 
     // Snapshot de facturación: se captura al crear el pago y NO cambia
     // después; no se lee de afiliados ni de acudientes (spec §8.1).
+    // El tipo es obligatorio: la factura electrónica distingue cédula de NIT.
+    // El default 'CC' es solo para tolerar filas legacy; la API siempre lo envía (Zod lo exige).
+    facturaTipoDocumento: text('factura_tipo_documento').notNull().default('CC'),
     facturaDocumento: text('factura_documento').notNull(),
     facturaNombre: text('factura_nombre').notNull(),
     facturaCelular: text('factura_celular'),
@@ -312,6 +315,17 @@ export const pagos = pgTable(
     estadoCheck: check(
       'pagos_estado_check',
       sql`${t.estado} in ('pendiente', 'verificado', 'rechazado')`,
+    ),
+    // Mismo dominio de tipos que afiliados + NIT (factura electrónica).
+    // Formato: alfanumérico con guion (NIT lleva dígito verificación con guion);
+    // solo dígitos cuando el tipo es CC o TI.
+    facturaTipoDocumentoCheck: check(
+      'pagos_factura_tipo_documento_check',
+      sql`${t.facturaTipoDocumento} in ('TI', 'CC', 'RC', 'PAS', 'PPT', 'NIT')`,
+    ),
+    facturaDocumentoCheck: check(
+      'pagos_factura_documento_check',
+      sql`${t.facturaDocumento} ~ '^[A-Z0-9-]+$' and (${t.facturaTipoDocumento} not in ('CC', 'TI') or ${t.facturaDocumento} ~ '^[0-9]+$')`,
     ),
   }),
 );

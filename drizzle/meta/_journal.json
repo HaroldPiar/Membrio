@@ -15,6 +15,13 @@
       "when": 1792807768902,
       "tag": "0001_slippery_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792809037519,
+      "tag": "0002_absent_medusa",
+      "breakpoints": true
     }
   ]
 }

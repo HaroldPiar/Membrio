@@ -138,7 +138,7 @@ Supabase publica el esquema `public` mediante su API de datos (PostgREST) con la
 
 - Los esquemas Zod viven en `/shared` y los usan la API (validación obligatoria) y los formularios React (mensajes inmediatos).
 - Dominios cerrados (tipo de documento, tipo de sangre, concepto, estado de pago) se validan en Zod **y** con CHECK en la base. Dominios que pueden variar por cliente (género, medio de captación) se validan solo en la API.
-- Número de documento: solo dígitos, a diferencia de los formularios actuales de Google Forms, que permiten texto.
+- Número de documento: alfanumérico en mayúsculas (los pasaportes llevan letras), normalizado con trim + mayúsculas en la API; **solo dígitos cuando el tipo es CC o TI**. RC y PPT quedan con formato flexible hasta confirmar con Truchas (ver supuesto 9, §16).
 - Fecha de cobertura: siempre día 1 del mes.
 - Un pago es válido solo si `monto_total` es igual a la suma de los montos de sus líneas.
 
@@ -154,7 +154,7 @@ Un pago es una transacción (`pagos`) que se aplica a una o más líneas (`pago_
 4. Un usuario revisa el comprobante y lo pasa a `verificado` o `rechazado`.
 5. Si se rechaza, se liberan sus líneas de detalle para permitir un nuevo intento del mismo mes.
 
-Los datos de facturación (documento, nombre, celular, correo) son un **snapshot** y no se leen de afiliados ni de acudientes. La UI puede sugerirlos como valores iniciales, pero lo guardado en el pago no cambia después.
+Los datos de facturación (tipo de documento — TI, CC, RC, PAS, PPT o NIT —, documento, nombre, celular, correo) son un **snapshot** y no se leen de afiliados ni de acudientes. La UI puede sugerirlos como valores iniciales, pero lo guardado en el pago no cambia después. El tipo de documento es obligatorio: la factura electrónica lo necesita para distinguir cédula de NIT.
 
 ### 8.2 Matrícula
 
@@ -198,7 +198,7 @@ Retirar es una operación explícita: fija `activo = false`, `fecha_retiro` y `m
 - Nombres de recursos en plural y en español, igual que las tablas.
 - Paginación por `limit` y `cursor` (máximo 100 por página).
 - Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "details": [...] } }`.
-- Códigos HTTP: 200/201 éxito, 400 validación, 401 sin sesión, 403 sin permiso por rol, 404 no encontrado (incluye otro tenant), 409 conflicto (duplicados), 500 error interno sin detalles técnicos.
+- Códigos HTTP: 200/201 éxito, 400 validación, 401 sin sesión, 403 sin permiso por rol, 404 no encontrado (incluye otro tenant), 409 conflicto (duplicados), 422 violación de integridad/reglas de la base (CHECK o FK), 500 error interno sin detalles técnicos.
 - Los identificadores de la API son los `id` de la base.
 
 ### Endpoints del MVP
@@ -297,6 +297,7 @@ Retirar es una operación explícita: fija `activo = false`, `fecha_retiro` y `m
 6. Tamaño máximo de archivos y tipos aceptados.
 7. Perfiles reales de usuarios y permisos de cada uno.
 8. Política de retención de datos y de respaldos.
+9. Formato exacto de documento: RC y PPT hoy aceptan alfanumérico (solo CC y TI exigen dígitos), y el NIT de facturación acepta alfanumérico con guion. Confirmar con Truchas si RC/PPT deben restringirse a dígitos.
 
 ## 17. Evolución prevista
 

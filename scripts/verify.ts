@@ -169,11 +169,56 @@ async function main(): Promise<void> {
         organizacionId: org.id,
         montoTotal: '1000.00',
         estado: 'volando',
+        facturaTipoDocumento: 'CC',
         facturaDocumento: '11111111',
         facturaNombre: 'Probe',
       }),
     ),
   );
+  await esperaError('23514', 'CHECK factura_tipo_documento ("XYZ" inválido)', () =>
+    enTransaccion((tx) =>
+      tx.insert(pagos).values({
+        organizacionId: org.id,
+        montoTotal: '1000.00',
+        estado: 'pendiente',
+        facturaTipoDocumento: 'XYZ',
+        facturaDocumento: '11111111',
+        facturaNombre: 'Probe',
+      }),
+    ),
+  );
+  await esperaError('23514', 'CHECK factura_documento CC (letras rechazadas)', () =>
+    enTransaccion((tx) =>
+      tx.insert(pagos).values({
+        organizacionId: org.id,
+        montoTotal: '1000.00',
+        estado: 'pendiente',
+        facturaTipoDocumento: 'CC',
+        facturaDocumento: 'AB12CD',
+        facturaNombre: 'Probe',
+      }),
+    ),
+  );
+  // NIT con dígito de verificación (alfanumérico con guion) se inserta.
+  await enTransaccion(async (tx) => {
+    try {
+      await tx.insert(pagos).values({
+        organizacionId: org.id,
+        montoTotal: '1000.00',
+        estado: 'pendiente',
+        facturaTipoDocumento: 'NIT',
+        facturaDocumento: '900123456-1',
+        facturaNombre: 'Empresa Probe',
+      });
+      registrar('CHECK factura NIT con guion (900123456-1) se inserta', true);
+    } catch (err) {
+      registrar(
+        'CHECK factura NIT con guion (900123456-1) se inserta',
+        false,
+        `falló con ${pgCode(err) ?? (err as Error).message}`,
+      );
+    }
+  });
   await esperaError('23514', 'CHECK fecha_cobertura día 1 (día 15)', () =>
     enTransaccion((tx) =>
       tx.insert(pagoDetalle).values({
