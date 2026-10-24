@@ -30,6 +30,40 @@ const FORMATO_FACTURACION = /^[A-Z0-9-]+$/;
 
 const TIPOS_SOLO_DIGITOS: ReadonlySet<string> = new Set(['CC', 'TI']);
 
+/**
+ * Regla del par (tipo, número) reutilizable desde cuerpos planos
+ * (afiliados, pagos: tipo_documento y numero_documento van como claves
+ * hermanas, en paridad con las columnas de la base).
+ *
+ * - CC/TI exigen solo dígitos (spec §7); el resto acepta el formato base.
+ * - `conGuion`: solo facturación (NIT lleva dígito verificación con guion).
+ *   afiliados/acudientes NO lo permiten: su CHECK de base es ^[A-Z0-9]+$.
+ */
+export function validarFormatoDocumento(
+  tipo: TipoDocumento | TipoDocumentoFacturacion,
+  numero: string,
+  ctx: { addIssue: (issue: { code: 'custom'; path: (string | number)[]; message: string }) => void },
+  ruta: (string | number)[] = ['numero_documento'],
+  opciones: { conGuion?: boolean } = {},
+): void {
+  if (TIPOS_SOLO_DIGITOS.has(tipo)) {
+    if (!SOLO_DIGITOS.test(numero)) {
+      ctx.addIssue({ code: 'custom', path: ruta, message: `${tipo} requiere solo dígitos` });
+    }
+    return;
+  }
+  const formato = opciones.conGuion ? FORMATO_FACTURACION : FORMATO_ALFANUMERICO;
+  if (!formato.test(numero)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ruta,
+      message: opciones.conGuion
+        ? 'Formato inválido: solo letras mayúsculas, números y guion'
+        : 'Formato inválido: solo letras mayúsculas y números (sin espacios ni símbolos)',
+    });
+  }
+}
+
 /** Número de documento normalizado (trim + mayúsculas) con formato alfanumérico general. */
 export const numeroDocumentoSchema = z
   .string()

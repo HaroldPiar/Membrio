@@ -20,5 +20,5 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["src", "scripts", "tests", "drizzle.config.ts"]
+  "include": ["src", "scripts", "tests", "drizzle.config.ts", "vitest.config.ts"]
 }

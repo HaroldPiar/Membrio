@@ -2,6 +2,7 @@ node_modules/
 .env
 dist/
 .astro/
+.storage/
 coverage/
 *.log
 .DS_Store
