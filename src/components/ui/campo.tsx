@@ -1,4 +1,4 @@
-/** Etiqueta + control + error de campo, para los formularios de afiliados. */
+/** Etiqueta + control + error de campo, para los formularios (afiliados, pagos…). */
 import type { ReactNode } from 'react';
 
 import { cn } from '../../lib/cn';

@@ -1,0 +1,13 @@
+---
+import { FormPago } from '../../components/pagos/form-pago';
+import AppLayout from '../../layouts/AppLayout.astro';
+
+// Enlace de la pestaña Cartera: /pagos/nuevo?afiliado=<uuid> preselecciona al
+// deudor. Un id que no parezca uuid se descarta (el resto lo resuelve la API).
+const afiliado = Astro.url.searchParams.get('afiliado');
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+---
+
+<AppLayout titulo="Registrar pago">
+  <FormPago client:load afiliadoInicial={afiliado && uuid.test(afiliado) ? afiliado : null} />
+</AppLayout>

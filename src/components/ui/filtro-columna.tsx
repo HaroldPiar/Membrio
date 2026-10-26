@@ -1,6 +1,6 @@
 /**
  * Filtro desplegable en el encabezado de una columna categórica
- * (Spec del cliente §4.3: Categoría, Plan, Estado de pago y Activo).
+ * (Spec del cliente §4.3: Categoría, Plan, Estado; §4.4: estado del pago).
  * Sin Radix: un botón + lista flotante que se cierra al hacer clic afuera o
  * con Escape. El valor vive en el estado del listado (filtra contra la API).
  */

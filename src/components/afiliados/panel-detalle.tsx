@@ -19,16 +19,11 @@ import { formatearDinero, formatearFecha, formatearInstante } from '../../lib/fo
 import { useAcudientes, useHistorialPagos } from '../../lib/consultas-afiliados';
 import { ErrorConsulta } from '../ui/error-consulta';
 import { EstadoPago } from '../ui/estado-pago';
+import { EstadoVerificacion } from '../ui/estado-verificacion';
 import { Boton } from '../ui/boton';
 import { CampoTexto } from '../ui/campo-texto';
-import { Campo } from './campo';
+import { Campo } from '../ui/campo';
 import { FormularioAcudiente } from './form-acudiente';
-
-const ESTADOS_PAGO_PAGOS = {
-  pendiente: { texto: 'Pendiente', clase: 'bg-por-vencer-bg text-por-vencer-fg' },
-  verificado: { texto: 'Verificado', clase: 'bg-al-dia-bg text-al-dia-fg' },
-  rechazado: { texto: 'Rechazado', clase: 'bg-en-mora-bg text-en-mora-fg' },
-} as const;
 
 function Dato({ etiqueta, valor, className }: { etiqueta: string; valor: string; className?: string }) {
   return (
@@ -353,9 +348,7 @@ export function PanelDetalle({
               <p className="py-3 text-sm text-muted-foreground">Sin pagos registrados.</p>
             ) : (
               <ul className="divide-y divide-border">
-                {historial.data.datos.map((pago) => {
-                  const estado = ESTADOS_PAGO_PAGOS[pago.estado];
-                  return (
+                {historial.data.datos.map((pago) => (
                     <li key={pago.id} className="flex items-center justify-between gap-3 py-2.5">
                       <div className="min-w-0">
                         <p className="text-sm font-medium tabular-nums">
@@ -365,14 +358,9 @@ export function PanelDetalle({
                           {formatearInstante(pago.created_at)}
                         </p>
                       </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${estado.clase}`}
-                      >
-                        {estado.texto}
-                      </span>
+                      <EstadoVerificacion estado={pago.estado} />
                     </li>
-                  );
-                })}
+                  ))}
               </ul>
             )}
           </section>

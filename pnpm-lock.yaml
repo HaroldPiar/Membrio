@@ -43,6 +43,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(postgres@3.4.9)
@@ -1761,6 +1764,9 @@ packages:
 
   decimal.js-light@2.5.1:
     resolution: {integrity: sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg==}
+
+  decimal.js@10.6.0:
+    resolution: {integrity: sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==}
 
   defu@6.1.7:
     resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
@@ -4131,6 +4137,8 @@ snapshots:
       supports-color: 10.2.2
 
   decimal.js-light@2.5.1: {}
+
+  decimal.js@10.6.0: {}
 
   defu@6.1.7: {}
 

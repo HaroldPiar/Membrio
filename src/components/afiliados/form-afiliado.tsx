@@ -33,7 +33,7 @@ import { Boton } from '../ui/boton';
 import { CampoTexto } from '../ui/campo-texto';
 import { CampoSeleccion } from '../ui/campo-seleccion';
 import { Tarjeta, TarjetaContenido, TarjetaEncabezado, TarjetaTitulo } from '../ui/tarjeta';
-import { Campo } from './campo';
+import { Campo } from '../ui/campo';
 
 const TIPOS_SANGRE = tipoSangreSchema.options;
 const vacioANulo = (valor: string) => (valor === '' ? null : valor);

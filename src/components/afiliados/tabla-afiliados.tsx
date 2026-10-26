@@ -20,7 +20,7 @@ import {
 import { cn } from '../../lib/cn';
 import type { Categoria, Plan } from '../../lib/consultas-afiliados';
 import { EstadoPago } from '../ui/estado-pago';
-import { FiltroColumna, type OpcionFiltro } from './filtro-columna';
+import { FiltroColumna, type OpcionFiltro } from '../ui/filtro-columna';
 
 export function TablaAfiliados({
   filas,

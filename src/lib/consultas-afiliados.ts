@@ -30,12 +30,16 @@ type ParametrosListado = ReturnType<typeof parametrosListado>;
  * Listado con filtros y cursor. `keepPreviousData` evita el parpadeo al pasar
  * de página: se ve la página anterior hasta que llega la nueva.
  */
-export function useAfiliados(parametros: ParametrosListado): UseQueryResult<AfiliadosPaginados, Error> {
+export function useAfiliados(
+  parametros: ParametrosListado,
+  habilitado = true,
+): UseQueryResult<AfiliadosPaginados, Error> {
   return useQuery<AfiliadosPaginados, Error>({
     queryKey: ['afiliados', 'lista', parametros],
     // OJO: openapi-fetch solo serializa `params.query` (el top-level `query`
     // pasa por el type catch-all pero el runtime lo ignora).
     queryFn: () => procesar(api.GET('/api/v1/afiliados', { params: { query: parametros } })),
+    enabled: habilitado,
     staleTime: 15_000,
     retry: false,
     placeholderData: keepPreviousData,

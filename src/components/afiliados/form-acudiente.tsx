@@ -15,7 +15,7 @@ import { api, procesar } from '../../lib/api';
 import { acudienteActualizacionSchema } from '../../shared/acudientes';
 import { Boton } from '../ui/boton';
 import { CampoTexto } from '../ui/campo-texto';
-import { Campo } from './campo';
+import { Campo } from '../ui/campo';
 import type { z } from '@hono/zod-openapi';
 
 type ValoresAcudienteForm = z.input<typeof acudienteActualizacionSchema>;
