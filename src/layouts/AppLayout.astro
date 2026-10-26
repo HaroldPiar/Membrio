@@ -1,0 +1,57 @@
+---
+/**
+ * Layout de las páginas autenticadas: encabezado delgado con "Membrio"
+ * centrado, menú lateral persistente y contenido (Spec del cliente §3).
+ * El ClientRouter habilita la navegación suave con transition:persist;
+ * /login no lo incluye (entrar y salir son navegaciones completas).
+ */
+import '../styles/global.css';
+import '@fontsource-variable/inter';
+import { ClientRouter } from 'astro:transitions';
+
+import { BarraLateral } from '../components/layout/barra-lateral';
+
+interface Props {
+  titulo: string;
+}
+const { titulo } = Astro.props;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titulo} · Membrio</title>
+    <!-- Sin parpadeo de tema: aplica la clase .dark ANTES del primer pintado.
+         Es is:inline a propósito (no puede importar src/lib/tema): si cambia
+         esa lógica, cambia aquí. -->
+    <script is:inline>
+      (function () {
+        var guardado = localStorage.getItem('membrio_tema');
+        var oscuro =
+          guardado === 'oscuro' ||
+          (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', oscuro);
+        document.documentElement.style.colorScheme = oscuro ? 'dark' : 'light';
+      })();
+    </script>
+    <ClientRouter />
+  </head>
+  <body class="min-h-screen bg-background">
+    <header class="sticky top-0 z-30 h-12 border-b bg-surface">
+      <div class="flex h-full items-center justify-center">
+        <span class="text-sm font-semibold tracking-tight">Membrio</span>
+      </div>
+    </header>
+    <div class="md:flex md:items-start">
+      <BarraLateral
+        client:load
+        transition:persist="barra-lateral"
+        rutaActual={Astro.url.pathname}
+      />
+      <main class="min-w-0 flex-1 p-4 sm:p-6">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

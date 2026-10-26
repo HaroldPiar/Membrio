@@ -1,0 +1,117 @@
+/**
+ * Tokens del cliente (Spec del cliente §2) sobre Tailwind v4 + shadcn/ui.
+ * El modo oscuro SOLO redefine variables en `.dark`: ningún componente
+ * conoce los dos temas.
+ *
+ * Los valores sin marca en el spec son derivados (§8.1) y se ajustan al
+ * verlos en pantalla; los estados de pago garantizan contraste AA con texto
+ * e ícono (§2.2), por eso el texto usa un tono más oscuro que el cálido puro.
+ */
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  /* §2.1 — tema claro */
+  --background: #f7f6fb;
+  --surface: #ffffff;
+  --foreground: #1c1b22;
+  --primary: #764edd;
+  --primary-foreground: #ffffff;
+  --muted: #efedf6;
+  --muted-foreground: #6b6880; /* derivado */
+  --borde: #e4e1f0; /* derivado */
+  --ring: #764edd;
+
+  /* Cálidos de acento (§2.1) */
+  --amarillo: #ffd43b;
+  --naranja: #ffa719;
+  --rojo: #e5484d;
+
+  /* Degradado de marca (§2.1): durazno → blanco */
+  --degradado-a: #feede5;
+  --degradado-b: #ffffff;
+
+  /* Estados de pago (§2.2): fondo tintado + texto con contraste (derivados) */
+  --al-dia-fg: #0e7490;
+  --al-dia-bg: #e6f6f7;
+  --por-vencer-fg: #9a5b00;
+  --por-vencer-bg: #fff3e0;
+  --en-mora-fg: #c42b30;
+  --en-mora-bg: #fdecec;
+
+  /* Errores de formulario: mismo rojo oscuro con contraste AA */
+  --error-fg: #c42b30;
+
+  color-scheme: light;
+}
+
+.dark {
+  /* §2.1 — tema oscuro */
+  --background: #131215;
+  --surface: #1c1b22;
+  --foreground: #eae9f0;
+  --primary: #b49cf5;
+  --primary-foreground: #1c1b22;
+  --muted: #26242d;
+  --muted-foreground: #9d9ab0; /* derivado */
+  --borde: #33303c; /* derivado */
+  --ring: #b49cf5;
+
+  /* Degradado de marca: morado → rojo oscuro */
+  --degradado-a: #210340;
+  --degradado-b: #451f1d;
+
+  /* Estados de pago en oscuro (tonos claros de los mismos cálidos) */
+  --al-dia-fg: #5eead4;
+  --al-dia-bg: #11312f;
+  --por-vencer-fg: #ffc46b;
+  --por-vencer-bg: #3a2a0e;
+  --en-mora-fg: #ff9598;
+  --en-mora-bg: #3a1618;
+
+  --error-fg: #ff9598;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--borde);
+  --color-ring: var(--ring);
+  --color-amarillo: var(--amarillo);
+  --color-naranja: var(--naranja);
+  --color-rojo: var(--rojo);
+  --color-error-fg: var(--error-fg);
+  --color-al-dia-fg: var(--al-dia-fg);
+  --color-al-dia-bg: var(--al-dia-bg);
+  --color-por-vencer-fg: var(--por-vencer-fg);
+  --color-por-vencer-bg: var(--por-vencer-bg);
+  --color-en-mora-fg: var(--en-mora-fg);
+  --color-en-mora-bg: var(--en-mora-bg);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

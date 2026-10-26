@@ -1,0 +1,39 @@
+---
+/**
+ * Layout público (solo /login): tarjeta centrada sobre el degradado de
+ * marca (durazno→blanco en claro, morado→rojo oscuro en oscuro; §2.1).
+ * Sin ClientRouter: entrar/salir son navegaciones completas.
+ */
+import '../styles/global.css';
+import '@fontsource-variable/inter';
+
+interface Props {
+  titulo: string;
+}
+const { titulo } = Astro.props;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titulo} · Membrio</title>
+    <!-- Misma lógica sin parpadeo que AppLayout (is:inline no importa módulos). -->
+    <script is:inline>
+      (function () {
+        var guardado = localStorage.getItem('membrio_tema');
+        var oscuro =
+          guardado === 'oscuro' ||
+          (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', oscuro);
+        document.documentElement.style.colorScheme = oscuro ? 'dark' : 'light';
+      })();
+    </script>
+  </head>
+  <body
+    class="min-h-screen"
+    style="background: linear-gradient(160deg, var(--degradado-a) 0%, var(--degradado-b) 100%);"
+  >
+    <slot />
+  </body>
+</html>

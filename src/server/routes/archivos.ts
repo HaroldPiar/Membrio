@@ -105,7 +105,11 @@ rutasArchivos.get('/api/v1/archivos/local', async (c) => {
   const { accion, ruta } = parametrosLocales(c.req.query());
   if (accion !== 'leer') throw new AppError(404, 'NO_ENCONTRADO', 'Archivo no encontrado');
   const bytes = await almacen.leer(ruta);
-  return new Response(bytes, {
+  // Tipado, no lógica: con lib DOM (cliente), BodyInit exige Uint8Array<ArrayBuffer>
+  // y la interfaz declara Uint8Array genérico. readFile entrega Buffer con ArrayBuffer
+  // plano, así que el cast es honesto. NO usar bytes.buffer: Buffer usa slab en pooling
+  // y el slab puede ser más grande que la vista.
+  return new Response(bytes as Uint8Array<ArrayBuffer>, {
     headers: {
       'content-type': tipoDesdeRuta(ruta),
       'cache-control': 'private, max-age=0, no-store',
