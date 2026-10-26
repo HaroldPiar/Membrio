@@ -24,7 +24,7 @@ import {
   type RecaudoDashboard,
 } from '../../lib/dashboard-datos';
 import { formatearDinero } from '../../lib/formato';
-import { ErrorConsulta } from './error-consulta';
+import { ErrorConsulta } from '../ui/error-consulta';
 
 const formatoEje = new Intl.NumberFormat('es-CO', {
   notation: 'compact',

@@ -24,15 +24,25 @@ const { titulo } = Astro.props;
     <title>{titulo} · Membrio</title>
     <!-- Sin parpadeo de tema: aplica la clase .dark ANTES del primer pintado.
          Es is:inline a propósito (no puede importar src/lib/tema): si cambia
-         esa lógica, cambia aquí. -->
+         esa lógica, cambia aquí. Con <ClientRouter /> cada navegación
+         reemplaza <html> y este script NO se re-ejecuta (Astro lo deduplica),
+         así que after-swap reaplica el tema al documento nuevo — sin eso, el
+         modo oscuro/sistema se perdía al cambiar de página y el selector del
+         menú seguía mostrando la preferencia guardada. -->
     <script is:inline>
       (function () {
-        var guardado = localStorage.getItem('membrio_tema');
-        var oscuro =
-          guardado === 'oscuro' ||
-          (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList.toggle('dark', oscuro);
-        document.documentElement.style.colorScheme = oscuro ? 'dark' : 'light';
+        var aplicar = function () {
+          var guardado = localStorage.getItem('membrio_tema');
+          var oscuro =
+            guardado === 'oscuro' ||
+            (guardado !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', oscuro);
+          document.documentElement.style.colorScheme = oscuro ? 'dark' : 'light';
+        };
+        aplicar();
+        // El listener vive en el mismo documento entre navegaciones: se registra
+        // una sola vez y corre después de cada swap.
+        document.addEventListener('astro:after-swap', aplicar);
       })();
     </script>
     <ClientRouter />

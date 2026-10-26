@@ -13,7 +13,7 @@ import {
   type EstadoAfiliado,
   type ResumenDashboard,
 } from '../../lib/dashboard-datos';
-import { ErrorConsulta } from './error-consulta';
+import { ErrorConsulta } from '../ui/error-consulta';
 
 const COLORES: Record<EstadoAfiliado, string> = {
   al_dia: 'var(--al-dia-fg)',

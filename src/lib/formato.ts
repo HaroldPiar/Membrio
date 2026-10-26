@@ -39,3 +39,28 @@ export function formatearDinero(valor: string): string {
   }
   return formateadorCOP.format(valor);
 }
+
+const formateadorFechaUTC = new Intl.DateTimeFormat('es-CO', {
+  dateStyle: 'medium',
+  timeZone: 'UTC',
+});
+const formateadorInstanteZona = new Intl.DateTimeFormat('es-CO', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'America/Bogota',
+});
+
+/**
+ * '2026-10-25' → '25 oct 2026'. Es un CALENDARIO (no un instante): se ancla a
+ * medianoche UTC para que la zona de negocio no lo corra al día anterior.
+ */
+export function formatearFecha(fecha: string): string {
+  const dia = new Date(`${fecha}T00:00:00Z`);
+  return Number.isNaN(dia.getTime()) ? '—' : formateadorFechaUTC.format(dia);
+}
+
+/** '2026-10-25T10:30:00.000Z' → '25 oct 2026, 5:30 a. m.' (zona de negocio). */
+export function formatearInstante(instante: string): string {
+  const momento = new Date(instante);
+  return Number.isNaN(momento.getTime()) ? '—' : formateadorInstanteZona.format(momento);
+}

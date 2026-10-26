@@ -27,3 +27,14 @@
 .grafico-recaudo .recharts-tooltip-cursor {
   fill: var(--muted);
 }
+
+/* Dona: mismo lenguaje de hover que las barras. El sector bajo el cursor se
+   queda pleno y los demás se atenúan; la leyenda de abajo ya trae los
+   valores, así que el hover aquí es de énfasis, no de datos nuevos. */
+.grafico-estados path {
+  transition: opacity 150ms ease;
+}
+
+.grafico-estados g.recharts-pie:hover path:not(:hover) {
+  opacity: 0.4;
+}

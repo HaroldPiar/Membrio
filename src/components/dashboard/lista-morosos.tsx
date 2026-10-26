@@ -15,7 +15,7 @@ import {
   type MorosidadDashboard,
 } from '../../lib/dashboard-datos';
 import { formatearDinero } from '../../lib/formato';
-import { ErrorConsulta } from './error-consulta';
+import { ErrorConsulta } from '../ui/error-consulta';
 
 const LIMITE = 5;
 

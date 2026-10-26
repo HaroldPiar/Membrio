@@ -1,12 +1,16 @@
 ---
-import { EstadoVacio } from '../components/ui/estado-vacio';
+import { Afiliados } from '../components/afiliados/afiliados';
 import AppLayout from '../layouts/AppLayout.astro';
+
+// Punto de entrada desde el dashboard: /afiliados?estado=en_mora (§4.2 → §4.3).
+// Cualquier valor desconocido se descarta — el resto de filtros vive en la URL
+// que arma la propia isla.
+const estado = Astro.url.searchParams.get('estado');
+const estadoValido =
+  estado === 'al_dia' || estado === 'por_vencer' || estado === 'en_mora' ? estado : null;
+const q = Astro.url.searchParams.get('q') ?? '';
 ---
+
 <AppLayout titulo="Afiliados">
-  <div class="space-y-4">
-    <h1 class="text-2xl font-semibold tracking-tight">Afiliados</h1>
-    <EstadoVacio
-      mensaje="El listado de nadadores con búsqueda, filtros y panel de detalle llega en la Fase 3 del cliente."
-    />
-  </div>
+  <Afiliados client:load estadoInicial={estadoValido} qInicial={q} />
 </AppLayout>

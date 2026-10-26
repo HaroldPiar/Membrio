@@ -11,7 +11,7 @@ import { Banknote, ClipboardCheck, TriangleAlert, Users, type LucideIcon } from 
 import { formatearDinero } from '../../lib/formato';
 import type { MorosidadDashboard, ResumenDashboard } from '../../lib/dashboard-datos';
 import { cn } from '../../lib/cn';
-import { ErrorConsulta } from './error-consulta';
+import { ErrorConsulta } from '../ui/error-consulta';
 
 type DatosTarjeta = {
   etiqueta: string;
