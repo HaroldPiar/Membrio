@@ -7,7 +7,7 @@ Multi-tenant SaaS for clubs/academies (first client: Truchas swim club). The spe
 Vitest is the test runner; there is no linter or formatter yet. Static gate: `pnpm typecheck`.
 
 - `pnpm typecheck` — `tsc --noEmit`. Strict: `noUncheckedIndexedAccess`, `verbatimModuleSyntax`, `noUnusedLocals/Parameters`. TS 7 (native): `paths` substitutions must be **relative** (`./src/*`) — `baseUrl` was removed and fails compilation.
-- `pnpm test` — unit tests (`tests/unit`): estado de pago, validación de pagos, casing, CSRF, formateo COP, menú por rol, mapeo de errores de la API. 63 assertions.
+- `pnpm test` — unit tests (`tests/unit`): estado de pago, validación de pagos, casing, CSRF, formateo COP, menú por rol, mapeo de errores de la API, transformaciones del dashboard. 71 assertions.
 - `pnpm test:integracion` — tenant-isolation + cookie de sesión/CSRF/búsqueda `?q=` (`tests/integracion`, needs DB + seed). 17 assertions.
 - `pnpm dev:api` — standalone API on :3000 (no Astro needed). Example login: `POST /api/v1/auth/dev-login` with `{"correo":"admin@truchas.test"}`.
 - `pnpm dev` — Astro on :4321 hosting the API (Astro 7 needs Node >= 22.23.4; cold start can take ~40s).
@@ -67,4 +67,5 @@ Invariants agents commonly violate by default (spec §5–§8):
 - Client structure (Astro conventions): `src/layouts` (`AppLayout.astro` with `<ClientRouter />` + `transition:persist` on the sidebar; `AuthLayout.astro` with the brand gradient), `src/pages` (login, index, afiliados, pagos, admin), `src/components/{ui,layout}` (React, Spanish identifiers: `Boton`, `Tarjeta`, `BarraLateral`…), `src/lib` (`api.ts` openapi-fetch wrapper + `mapearErrorApi`/`procesar`, `sesion.ts` `/me` + logout, `tema.ts`, `formato.ts`, `cn.ts`), `src/lib/tipos-api.ts` (generated — never hand-edit), `src/middleware.ts` (route protection, verifies the cookie JWT with jose; UX only — security is the API's `requerirAuth`).
 - Route protection lives in Astro's `src/middleware.ts`, NOT in `requerirAuth`: middleware guards page HTML (no flash), `requerirAuth` guards data. Both check `iss: membrio` / `aud: membrio-api` / HS256.
 - Menu data (`src/components/layout/entradas-menu.ts`) is pure (no React/icons) so role filtering is unit-testable; icon keys map to lucide in `barra-lateral.tsx`.
+- Dashboard (client Fase 2): one island `src/components/dashboard/dashboard.tsx` (single QueryClient) over `/api/v1/dashboard/{resumen,morosidad,recaudo}`; pure transforms in `src/lib/dashboard-datos.ts` (unit-tested: money stays a string, sorting in exact cents via `centavosDesdeCadena`, bar `magnitud` is geometry-only); Recharts colors go through `src/styles/graficos.css` CSS vars (SVG attributes don't resolve `var()`). Morosos link to `/afiliados?estado=en_mora` — Fase 3 must read that query param.
 - `.atl/` is auto-generated (gentle-ai skill-registry) — don't edit by hand.

@@ -1,12 +1,7 @@
 ---
-import { EstadoVacio } from '../components/ui/estado-vacio';
+import { Dashboard } from '../components/dashboard/dashboard';
 import AppLayout from '../layouts/AppLayout.astro';
 ---
 <AppLayout titulo="Dashboard">
-  <div class="space-y-4">
-    <h1 class="text-2xl font-semibold tracking-tight">Dashboard</h1>
-    <EstadoVacio
-      mensaje="Aquí verás el recaudo del mes, la cartera pendiente y los pagos por verificar (Fase 2 del cliente)."
-    />
-  </div>
+  <Dashboard client:load />
 </AppLayout>

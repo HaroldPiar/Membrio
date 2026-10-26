@@ -1,0 +1,29 @@
+/**
+ * Gráficos del dashboard (Recharts, Spec del cliente §5).
+ *
+ * Recharts pinta atributos SVG y los atributos NO resuelven `var()` del tema,
+ * así que los colores se fijan por CSS acá abajo (sí resuelve variables) — el
+ * modo oscuro se sigue sin re-render de React. Mismo motivo por el que el
+ * cursor del tooltip va por CSS.
+ */
+.grafico-recaudo rect {
+  fill: var(--primary);
+}
+
+.grafico-recaudo rect:hover {
+  fill: var(--al-dia-fg);
+}
+
+.grafico-recaudo text {
+  fill: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.grafico-recaudo .recharts-cartesian-grid line,
+.grafico-recaudo .recharts-cartesian-axis-line {
+  stroke: var(--borde);
+}
+
+.grafico-recaudo .recharts-tooltip-cursor {
+  fill: var(--muted);
+}

@@ -8,6 +8,7 @@
  * e ícono (§2.2), por eso el texto usa un tono más oscuro que el cálido puro.
  */
 @import 'tailwindcss';
+@import './graficos.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
