@@ -4,7 +4,8 @@
  *
  *  - buscar nadador(es) por nombre o documento y elegir varios (una familia
  *    paga varios meses de varios hermanos en un solo pago);
- *  - marcar meses (febrero a diciembre) + matrícula opcional, con valor
+ *  - marcar, POR CADA nadador, sus meses con año (desde SU mes de ingreso;
+ *    multi-año en un mismo pago) + matrícula opcional, con valor
  *    sugerido desde el plan (la mensualidad ya viene con el descuento del
  *    afiliado, igual que la cartera del dashboard);
  *  - facturación precargada con el primer nadador elegido, editable;
@@ -28,15 +29,15 @@ import {
   ACEPTACION_COMPROBANTE,
   ETIQUETAS_CONCEPTO,
   ETIQUETAS_DOCUMENTO_FACTURACION,
-  MESES_COBRABLES,
-  NOMBRES_MES,
-  aniosRegistro,
+  aniosMatriculaDe,
   esDineroValido,
   esMimeComprobante,
   esquemaFacturacion,
+  etiquetaMesAnio,
   facturacionDesdeAfiliado,
   lineasDesde,
-  sugerenciasDe,
+  mesesCobrablesDe,
+  nuevaSeleccion,
   totalLineas,
   validarComprobante,
   type SeleccionAfiliado,
@@ -68,6 +69,95 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
   );
 }
 
+/**
+ * «Meses que cubre el pago» POR NADADOR (cada uno marca los suyos, con año
+ * mezclable: nov-25 + feb-26 en el mismo pago) + matrícula opcional. Los
+ * meses disponibles arrancan en el mes de ingreso: nada previo a la
+ * inscripción (§4.5). Enero no aparece: lo cubre la matrícula.
+ */
+function BloqueMeses({
+  seleccion,
+  onToggleMes,
+  onMatricula,
+}: {
+  seleccion: SeleccionAfiliado;
+  onToggleMes: (clave: string) => void;
+  onMatricula: (anio: number | null) => void;
+}) {
+  const grupos = mesesCobrablesDe(seleccion.afiliado.fecha_ingreso);
+  const aniosMatricula = aniosMatriculaDe(seleccion.afiliado.fecha_ingreso);
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Meses que cubre el pago
+      </p>
+      {grupos.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Este nadador aún no tiene meses cobrables.
+        </p>
+      ) : (
+        grupos.map((grupo) => (
+          <div key={grupo.anio} className="mt-2">
+            <p className="text-xs font-medium text-muted-foreground">{grupo.anio}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {grupo.claves.map((clave) => {
+                const marcado = seleccion.meses.includes(clave);
+                return (
+                  <button
+                    key={clave}
+                    type="button"
+                    aria-pressed={marcado}
+                    aria-label={etiquetaMesAnio(clave)}
+                    onClick={() => onToggleMes(clave)}
+                    className={cn(
+                      'rounded-md border px-2.5 py-1 text-sm transition-colors',
+                      marcado
+                        ? 'border-primary bg-primary/10 font-medium text-primary'
+                        : 'border-border bg-surface hover:bg-muted',
+                    )}
+                  >
+                    {etiquetaMesAnio(clave)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
+      {aniosMatricula.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={seleccion.matriculaAnio !== null}
+              onChange={(evento) =>
+                onMatricula(evento.target.checked ? (seleccion.matriculaAnio ?? aniosMatricula.at(-1) ?? null) : null)
+              }
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            Matrícula de enero
+          </label>
+          {seleccion.matriculaAnio !== null && (
+            <CampoSeleccion
+              id={`matricula-anio-${seleccion.afiliado.id}`}
+              aria-label="Año de la matrícula"
+              value={String(seleccion.matriculaAnio)}
+              onChange={(evento) => onMatricula(Number(evento.target.value))}
+            >
+              {aniosMatricula.map((anio) => (
+                <option key={anio} value={anio}>
+                  {anio}
+                </option>
+              ))}
+            </CampoSeleccion>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FormPago({ afiliadoInicial }: { afiliadoInicial: string | null }) {
   return (
     <ProveedorConsultas>
@@ -80,9 +170,6 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
   const queryClient = useQueryClient();
   const planes = usePlanes();
   const [selecciones, setSelecciones] = useState<SeleccionAfiliado[]>([]);
-  const [meses, setMeses] = useState<string[]>([]);
-  const [matricula, setMatricula] = useState(false);
-  const [anio, setAnio] = useState(() => aniosRegistro()[0]);
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [errorComprobante, setErrorComprobante] = useState<string | null>(null);
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
@@ -109,7 +196,7 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
     if (yaElegido) return;
     setSelecciones((previo) => [
       ...previo,
-      { afiliado, ...sugerenciasDe(afiliado, planes.data?.datos.find((p) => p.id === afiliado.plan_id)) },
+      nuevaSeleccion(afiliado, planes.data?.datos.find((p) => p.id === afiliado.plan_id)),
     ]);
     // Precarga de facturación solo con el PRIMER nadador y si el operador
     // no tocó nada todavía (§4.5: precargados pero editables).
@@ -128,9 +215,27 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
       ),
     );
 
-  const toggleMes = (mes: string) =>
-    setMeses((previo) =>
-      previo.includes(mes) ? previo.filter((valor) => valor !== mes) : [...previo, mes],
+  /** Meses POR NADADOR: cada uno marca los suyos (multi-año permitido). */
+  const toggleMes = (id: string, clave: string) =>
+    setSelecciones((previo) =>
+      previo.map((seleccion) =>
+        seleccion.afiliado.id === id
+          ? {
+              ...seleccion,
+              meses: seleccion.meses.includes(clave)
+                ? seleccion.meses.filter((mes) => mes !== clave)
+                : [...seleccion.meses, clave],
+            }
+          : seleccion,
+      ),
+    );
+
+  /** Matrícula por nadador: año elegible o null (sin matrícula). */
+  const setMatricula = (id: string, anio: number | null) =>
+    setSelecciones((previo) =>
+      previo.map((seleccion) =>
+        seleccion.afiliado.id === id ? { ...seleccion, matriculaAnio: anio } : seleccion,
+      ),
     );
 
   const elegirArchivo = (archivo: File | null) => {
@@ -162,10 +267,7 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
     // eslint-disable-next-line react-hooks/exhaustive-deps -- efecto de inicialización
   }, [prefill, planes.data, afiliadoInicial]);
 
-  const lineas = useMemo(
-    () => lineasDesde(selecciones, meses, matricula, anio),
-    [selecciones, meses, matricula, anio],
-  );
+  const lineas = useMemo(() => lineasDesde(selecciones), [selecciones]);
   const total = lineas.every((linea) => esDineroValido(linea.monto)) ? totalLineas(lineas) : null;
   const nombresPlanes = new Map((planes.data?.datos ?? []).map((plan) => [plan.id, plan.nombre]));
 
@@ -177,7 +279,9 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
       return;
     }
     if (lineas.length === 0) {
-      setErrorFormulario('Marca al menos un mes (febrero a diciembre) o activa la matrícula.');
+      setErrorFormulario(
+        'Marca al menos un mes (febrero a diciembre) o la matrícula en uno de los nadadores.',
+      );
       return;
     }
     if (selecciones.some((s) => !esDineroValido(s.valorMensual) || !esDineroValido(s.valorMatricula))) {
@@ -280,8 +384,9 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
               {selecciones.length === 0 ? (
                 <EstadoVacio mensaje="Busca por nombre o documento y agrega a quien paga." />
               ) : (
-                <div className="space-y-3">
-                  {selecciones.map((seleccion) => {
+                <>
+                  <div className="space-y-3">
+                    {selecciones.map((seleccion) => {
                     const id = seleccion.afiliado.id;
                     const errorMensual = esDineroValido(seleccion.valorMensual)
                       ? undefined
@@ -333,63 +438,22 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
                             />
                           </Campo>
                         </div>
+
+                        <BloqueMeses
+                          seleccion={seleccion}
+                          onToggleMes={(clave) => toggleMes(id, clave)}
+                          onMatricula={(anio) => setMatricula(id, anio)}
+                        />
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cada nadador marca sus propios meses (pueden mezclarse años: «Nov 2025» y
+                    «Feb 2026» en el mismo pago). Enero no es facturable: lo cubre la matrícula.
+                  </p>
+                </>
               )}
-            </Seccion>
-
-            <Seccion titulo="Meses que cubre el pago">
-              <div className="flex flex-wrap items-end gap-4">
-                <Campo id="anio" etiqueta="Año" className="w-32">
-                  <CampoSeleccion
-                    id="anio"
-                    value={String(anio)}
-                    onChange={(evento) => setAnio(Number(evento.target.value))}
-                  >
-                    {aniosRegistro().map((valor) => (
-                      <option key={valor} value={valor}>
-                        {valor}
-                      </option>
-                    ))}
-                  </CampoSeleccion>
-                </Campo>
-                <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={matricula}
-                    onChange={(evento) => setMatricula(evento.target.checked)}
-                    className="h-4 w-4 rounded border-border accent-primary"
-                  />
-                  Matrícula de enero ({anio})
-                </label>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {MESES_COBRABLES.map((mes) => {
-                  const marcado = meses.includes(mes);
-                  return (
-                    <button
-                      key={mes}
-                      type="button"
-                      aria-pressed={marcado}
-                      onClick={() => toggleMes(mes)}
-                      className={cn(
-                        'rounded-md border px-3 py-1.5 text-sm transition-colors',
-                        marcado
-                          ? 'border-primary bg-primary/10 font-medium text-primary'
-                          : 'border-border bg-surface hover:bg-muted',
-                      )}
-                    >
-                      {NOMBRES_MES[mes]}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Enero no es facturable: lo cubre la matrícula. Los meses marcados aplican a todos
-                los nadadores elegidos.
-              </p>
             </Seccion>
 
             <Seccion titulo="Facturación">
@@ -524,7 +588,7 @@ function ContenidoFormPago({ afiliadoInicial }: { afiliadoInicial: string | null
                             <td className="px-3 py-2">{ETIQUETAS_CONCEPTO[linea.concepto]}</td>
                             <td className="px-3 py-2">
                               {linea.concepto === 'matricula'
-                                ? `Enero de ${anio}`
+                                ? `Enero de ${linea.fecha_cobertura.slice(0, 4)}`
                                 : etiquetaMesLarga(linea.fecha_cobertura.slice(0, 7))}
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums">

@@ -61,14 +61,34 @@ export type FiltrosPagos = {
   estado: EstadoVerificacion | null;
   desde: string;
   hasta: string;
+  /** Texto parcial sobre factura_nombre / factura_documento. */
+  factura: string;
+  /** Fecha de verificación (revisado_en), rango o fecha única. */
+  revisado_desde: string;
+  revisado_hasta: string;
 };
 
-export const FILTROS_INICIALES_PAGOS: FiltrosPagos = { estado: null, desde: '', hasta: '' };
+export const FILTROS_INICIALES_PAGOS: FiltrosPagos = {
+  estado: null,
+  desde: '',
+  hasta: '',
+  factura: '',
+  revisado_desde: '',
+  revisado_hasta: '',
+};
 
 /** Bandeja de trabajo: la pestaña Por verificar es el filtro estado=pendiente. */
-export const FILTROS_PENDIENTES: FiltrosPagos = { estado: 'pendiente', desde: '', hasta: '' };
+export const FILTROS_PENDIENTES: FiltrosPagos = { ...FILTROS_INICIALES_PAGOS, estado: 'pendiente' };
 
 export const LIMITE_PAGOS = 20;
+
+export type CamposFiltroPagos =
+  | 'estado'
+  | 'desde'
+  | 'hasta'
+  | 'factura'
+  | 'revisado_desde'
+  | 'revisado_hasta';
 
 export type ParametrosPagos = {
   limit: number;
@@ -76,6 +96,9 @@ export type ParametrosPagos = {
   estado?: EstadoVerificacion;
   desde?: string;
   hasta?: string;
+  factura?: string;
+  revisado_desde?: string;
+  revisado_hasta?: string;
 };
 
 /** Filtros + cursor → query de GET /pagos. Los vacíos se OMITEN (§4.4). */
@@ -84,6 +107,9 @@ export function parametrosPagos(filtros: FiltrosPagos, cursor?: string): Paramet
   if (filtros.estado) parametros.estado = filtros.estado;
   if (filtros.desde) parametros.desde = filtros.desde;
   if (filtros.hasta) parametros.hasta = filtros.hasta;
+  if (filtros.factura.trim()) parametros.factura = filtros.factura.trim();
+  if (filtros.revisado_desde) parametros.revisado_desde = filtros.revisado_desde;
+  if (filtros.revisado_hasta) parametros.revisado_hasta = filtros.revisado_hasta;
   if (cursor) parametros.cursor = cursor;
   return parametros;
 }
@@ -91,7 +117,7 @@ export function parametrosPagos(filtros: FiltrosPagos, cursor?: string): Paramet
 /** Transición de un filtro (string del control) al estado tipado. '' = sin filtro. */
 export function conFiltroPagos(
   filtros: FiltrosPagos,
-  campo: 'estado' | 'desde' | 'hasta',
+  campo: CamposFiltroPagos,
   valor: string,
 ): FiltrosPagos {
   if (campo === 'estado') {
@@ -99,6 +125,18 @@ export function conFiltroPagos(
     return { ...filtros, estado };
   }
   return { ...filtros, [campo]: valor };
+}
+
+/** ¿Hay algún filtro activo? (copia de vacío y botón «Limpiar filtros»). */
+export function hayFiltrosPagos(filtros: FiltrosPagos): boolean {
+  return (
+    filtros.estado !== null ||
+    filtros.desde !== '' ||
+    filtros.hasta !== '' ||
+    filtros.factura.trim() !== '' ||
+    filtros.revisado_desde !== '' ||
+    filtros.revisado_hasta !== ''
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -135,10 +173,47 @@ export const NOMBRES_MES: Record<string, string> = {
   '12': 'Diciembre',
 };
 
-/** Año actual y anterior: la cartera puede adeudar meses del año previo. */
-export function aniosRegistro(): [number, number] {
-  const actual = new Date().getFullYear();
-  return [actual, actual - 1];
+/**
+ * Claves 'AAAA-MM' cobrables para un nadador, agrupadas por año en orden
+ * cronológico: desde SU mes de ingreso (inclusive) hasta diciembre del año
+ * en curso. Solo meses facturables (feb–dic): enero lo cubre la matrícula.
+ * Un pago nunca puede cubrir meses previos a la inscripción.
+ */
+export function mesesCobrablesDe(fechaIngreso: string): { anio: number; claves: string[] }[] {
+  const [anioIngreso, mesIngreso] = fechaIngreso.split('-').map(Number);
+  if (!anioIngreso || !mesIngreso) return [];
+  const anioActual = new Date().getFullYear();
+  const grupos: { anio: number; claves: string[] }[] = [];
+  for (let anio = anioIngreso; anio <= anioActual; anio += 1) {
+    const claves: string[] = [];
+    for (const mes of MESES_COBRABLES) {
+      if (anio === anioIngreso && Number(mes) < mesIngreso) continue;
+      claves.push(`${anio}-${mes}`);
+    }
+    if (claves.length > 0) grupos.push({ anio, claves });
+  }
+  return grupos;
+}
+
+/**
+ * Años de matrícula ofrecidos: enero de cada año desde el de ingreso (solo
+ * si el nadador ya había ingresado en ese enero) hasta el año en curso.
+ */
+export function aniosMatriculaDe(fechaIngreso: string): number[] {
+  const [anioIngreso, mesIngreso] = fechaIngreso.split('-').map(Number);
+  if (!anioIngreso || !mesIngreso) return [];
+  const anioActual = new Date().getFullYear();
+  const anios: number[] = [];
+  for (let anio = anioIngreso; anio <= anioActual; anio += 1) {
+    if (anio === anioIngreso && mesIngreso > 1) continue;
+    anios.push(anio);
+  }
+  return anios;
+}
+
+/** '2025-11' → 'Nov 2025' (chip de mes con año para no confundir 2025/2026). */
+export function etiquetaMesAnio(clave: string): string {
+  return `${NOMBRES_MES[clave.slice(5, 7)]?.slice(0, 3) ?? clave.slice(5, 7)} ${clave.slice(0, 4)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +226,16 @@ export type SeleccionAfiliado = {
   valorMensual: string;
   /** Matrícula al valor crudo del plan (el descuento no aplica, editable). */
   valorMatricula: string;
+  /** Claves 'AAAA-MM' marcadas POR ESTE nadador (cada uno cubre lo suyo). */
+  meses: string[];
+  /** Año de la matrícula marcada; null = sin matrícula. */
+  matriculaAnio: number | null;
 };
+
+/** Nadador recién elegido: valores sugeridos y sin meses marcados. */
+export function nuevaSeleccion(afiliado: Afiliado, plan: Plan | undefined): SeleccionAfiliado {
+  return { afiliado, ...sugerenciasDe(afiliado, plan), meses: [], matriculaAnio: null };
+}
 
 export type LineaPago = {
   afiliado_id: string;
@@ -178,30 +262,28 @@ export function sugerenciasDe(
 }
 
 /**
- * Selección × meses → líneas del request. `fecha_cobertura` es SIEMPRE día 1
- * (§5) y la matrícula cae el 1 de enero del año elegido (§8.2).
+ * Selección × meses → líneas del request. Cada nadador aporta SUS meses
+ * ('AAAA-MM', posible mezcla entre años) y su matrícula opcional.
+ * `fecha_cobertura` es SIEMPRE día 1 (§5) y la matrícula cae el 1 de enero
+ * del año elegido (§8.2). Las líneas salen ordenadas por nadador y, dentro
+ * de cada uno, cronológicamente.
  */
-export function lineasDesde(
-  selecciones: readonly SeleccionAfiliado[],
-  meses: readonly string[],
-  matricula: boolean,
-  anio: number,
-): LineaPago[] {
+export function lineasDesde(selecciones: readonly SeleccionAfiliado[]): LineaPago[] {
   const lineas: LineaPago[] = [];
   for (const seleccion of selecciones) {
-    for (const mes of meses) {
+    for (const clave of [...seleccion.meses].sort()) {
       lineas.push({
         afiliado_id: seleccion.afiliado.id,
         concepto: 'mensualidad',
-        fecha_cobertura: `${anio}-${mes}-01`,
+        fecha_cobertura: `${clave}-01`,
         monto: seleccion.valorMensual,
       });
     }
-    if (matricula) {
+    if (seleccion.matriculaAnio !== null) {
       lineas.push({
         afiliado_id: seleccion.afiliado.id,
         concepto: 'matricula',
-        fecha_cobertura: `${anio}-01-01`,
+        fecha_cobertura: `${seleccion.matriculaAnio}-01-01`,
         monto: seleccion.valorMatricula,
       });
     }

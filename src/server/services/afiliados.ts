@@ -5,6 +5,7 @@
 import { AppError, noEncontrado } from '../errors';
 import type { ContextoTenant } from '../middleware/auth';
 import * as reposAfiliados from '../repositories/afiliados';
+import type { DireccionOrden, OrdenAfiliado } from '../repositories/afiliados';
 import { mesesPagadosVerificados } from '../repositories/pagos';
 import type { EstadoPagoCalculado, ResultadoEstado } from './estado-pago';
 import { calcularEstadoPago, hoyEnZona } from './estado-pago';
@@ -48,9 +49,29 @@ export type FiltrosListado = {
   categoria?: string | undefined;
   plan?: string | undefined;
   estado_pago?: EstadoPagoCalculado | undefined;
+  orden?: OrdenAfiliado | undefined;
+  direccion?: DireccionOrden | undefined;
   cursor?: { clave: string; id: string } | undefined;
   limit: number;
 };
+
+/** Clave de orden del row: nombre (por defecto) o número de documento. */
+function claveDeOrden(fila: FilaListado, orden: OrdenAfiliado | undefined): string {
+  return orden === 'documento' ? fila.numeroDocumento : fila.nombre;
+}
+
+/** ¿La fila queda DESPUÉS del cursor en el orden (campo, id) aplicado? */
+function esPosteriorAlCursor(
+  fila: FilaListado,
+  cursor: { clave: string; id: string },
+  orden: OrdenAfiliado | undefined,
+  descendente: boolean,
+): boolean {
+  const clave = claveDeOrden(fila, orden);
+  const cmpClave = clave < cursor.clave ? -1 : clave > cursor.clave ? 1 : 0;
+  const cmp = cmpClave !== 0 ? cmpClave : fila.id < cursor.id ? -1 : fila.id > cursor.id ? 1 : 0;
+  return descendente ? cmp < 0 : cmp > 0;
+}
 
 export type FilaListado = Awaited<ReturnType<typeof reposAfiliados.listarAfiliados>>[number];
 export type FilaConEstado = FilaListado & { estado_pago: EstadoPagoCalculado | null };
@@ -77,12 +98,11 @@ export async function listarAfiliados(
     });
     const estados = await estadosDe(ctx, filas, hoy);
     const cumplen = filas.filter((f) => estados.get(f.id)?.estado === filtros.estado_pago);
-    // Cursor sobre el orden (nombre, id) ya aplicado por SQL.
+    // Cursor sobre el orden (campo, id) ya aplicado por SQL.
     const cursor = filtros.cursor;
+    const descendente = filtros.direccion === 'desc';
     const desde = cursor
-      ? cumplen.findIndex(
-          (f) => f.nombre > cursor.clave || (f.nombre === cursor.clave && f.id > cursor.id),
-        )
+      ? cumplen.findIndex((f) => esPosteriorAlCursor(f, cursor, filtros.orden, descendente))
       : 0;
     const inicio = desde >= 0 ? desde : cumplen.length;
     return cumplen.slice(inicio, inicio + filtros.limit).map((f) => ({

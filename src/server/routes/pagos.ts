@@ -95,6 +95,9 @@ rutasPagos.openapi(rutaListar, async (c) => {
     afiliado: q.afiliado,
     desde: q.desde,
     hasta: q.hasta,
+    factura: q.factura,
+    revisadoDesde: q.revisado_desde,
+    revisadoHasta: q.revisado_hasta,
     cursor: decodificarCursor(q.cursor),
     limit: limiteConDetras(q.limit),
   });

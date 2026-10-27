@@ -27,12 +27,17 @@ export type EstadoPagoAfiliado = z.infer<typeof estadoPagoSchema>;
 // Filtros del listado
 // ---------------------------------------------------------------------------
 
+export type OrdenAfiliado = 'nombre' | 'documento';
+export type DireccionOrden = 'asc' | 'desc';
+
 export type FiltrosAfiliados = {
   q: string;
   activo: boolean | null;
   categoria: string;
   plan: string;
   estado_pago: EstadoPagoAfiliado | null;
+  orden: OrdenAfiliado;
+  direccion: DireccionOrden;
 };
 
 export const FILTROS_INICIALES: FiltrosAfiliados = {
@@ -41,6 +46,8 @@ export const FILTROS_INICIALES: FiltrosAfiliados = {
   categoria: '',
   plan: '',
   estado_pago: null,
+  orden: 'nombre',
+  direccion: 'asc',
 };
 
 export const LIMITE_LISTADO = 20;
@@ -60,6 +67,8 @@ export function parametrosListado(
   categoria?: string;
   plan?: string;
   estado_pago?: EstadoPagoAfiliado;
+  orden?: OrdenAfiliado;
+  direccion?: DireccionOrden;
 } {
   const parametros: {
     limit: number;
@@ -69,6 +78,8 @@ export function parametrosListado(
     categoria?: string;
     plan?: string;
     estado_pago?: EstadoPagoAfiliado;
+    orden?: OrdenAfiliado;
+    direccion?: DireccionOrden;
   } = { limit: LIMITE_LISTADO };
 
   const q = filtros.q.trim();
@@ -77,6 +88,9 @@ export function parametrosListado(
   if (filtros.categoria) parametros.categoria = filtros.categoria;
   if (filtros.plan) parametros.plan = filtros.plan;
   if (filtros.estado_pago) parametros.estado_pago = filtros.estado_pago;
+  // El orden por defecto (nombre ASC) se OMITE: la API ya ordena así.
+  if (filtros.orden !== 'nombre') parametros.orden = filtros.orden;
+  if (filtros.direccion !== 'asc') parametros.direccion = filtros.direccion;
   if (cursor) parametros.cursor = cursor;
   return parametros;
 }
@@ -100,6 +114,21 @@ export function conFiltro(
   return { ...filtros, [campo]: valor };
 }
 
+/**
+ * Clic en un encabezado ordenable: alterna ASC ⇄ DESC del mismo campo, o
+ * activa el campo en ASC si estaba ordenado por otro. El cursor vuelve a
+ * cero (lo hace el caller con cambiarFiltros).
+ */
+export function alternarOrden(
+  filtros: FiltrosAfiliados,
+  campo: OrdenAfiliado,
+): FiltrosAfiliados {
+  if (filtros.orden === campo) {
+    return { ...filtros, direccion: filtros.direccion === 'asc' ? 'desc' : 'asc' };
+  }
+  return { ...filtros, orden: campo, direccion: 'asc' };
+}
+
 /** Los filtros activos se mandan a la URL para que el enlace sea compartible. */
 export function filtrosAUrl(filtros: FiltrosAfiliados): string {
   const parametros = new URLSearchParams();
@@ -109,6 +138,8 @@ export function filtrosAUrl(filtros: FiltrosAfiliados): string {
   if (filtros.categoria) parametros.set('categoria', filtros.categoria);
   if (filtros.plan) parametros.set('plan', filtros.plan);
   if (filtros.estado_pago) parametros.set('estado', filtros.estado_pago);
+  if (filtros.orden !== 'nombre') parametros.set('orden', filtros.orden);
+  if (filtros.direccion !== 'asc') parametros.set('direccion', filtros.direccion);
   const texto = parametros.toString();
   return texto ? `/afiliados?${texto}` : '/afiliados';
 }
@@ -116,7 +147,13 @@ export function filtrosAUrl(filtros: FiltrosAfiliados): string {
 /** Lee la URL inicial (enlace del dashboard: /afiliados?estado=en_mora). */
 export function filtrosDeUrl(
   params: URLSearchParams,
-): { estado_pago: EstadoPagoAfiliado | null; q: string; activo: boolean | null } {
+): {
+  estado_pago: EstadoPagoAfiliado | null;
+  q: string;
+  activo: boolean | null;
+  orden: OrdenAfiliado;
+  direccion: DireccionOrden;
+} {
   const estado = params.get('estado');
   const estadoPago =
     estado === 'al_dia' || estado === 'por_vencer' || estado === 'en_mora' ? estado : null;
@@ -125,6 +162,8 @@ export function filtrosDeUrl(
     estado_pago: estadoPago,
     q: params.get('q') ?? '',
     activo: activo === 'true' ? true : activo === 'false' ? false : null,
+    orden: params.get('orden') === 'documento' ? 'documento' : 'nombre',
+    direccion: params.get('direccion') === 'desc' ? 'desc' : 'asc',
   };
 }
 

@@ -20,8 +20,11 @@ import {
   esquemaFacturacion,
   facturacionDesdeAfiliado,
   facturacionVacia,
-  aniosRegistro,
+  aniosMatriculaDe,
+  etiquetaMesAnio,
   lineasDesde,
+  mesesCobrablesDe,
+  nuevaSeleccion,
   parametrosPagos,
   sugerenciasDe,
   totalLineas,
@@ -77,8 +80,8 @@ function plan(mensualidad = '35000.00', matricula = '80000.00'): Plan {
   };
 }
 
-function seleccion(descuento = '0'): SeleccionAfiliado {
-  return { afiliado: afiliado(descuento), ...sugerenciasDe(afiliado(descuento), plan()) };
+function seleccion(descuento = '0', meses: string[] = [], matriculaAnio: number | null = null): SeleccionAfiliado {
+  return { ...nuevaSeleccion(afiliado(descuento), plan()), meses, matriculaAnio };
 }
 
 /** Réplica del cálculo del backend (services/dashboard.ts) en centavos. */
@@ -99,7 +102,12 @@ describe('parametrosPagos (filtros → query)', () => {
 
   it('incluye solo lo filtrado, con cursor cuando existe', () => {
     const parametros = parametrosPagos(
-      { estado: 'rechazado', desde: '2026-01-01', hasta: '2026-01-31' },
+      {
+        ...FILTROS_INICIALES_PAGOS,
+        estado: 'rechazado',
+        desde: '2026-01-01',
+        hasta: '2026-01-31',
+      },
       'cursor123',
     );
     expect(parametros).toEqual({
@@ -109,6 +117,23 @@ describe('parametrosPagos (filtros → query)', () => {
       hasta: '2026-01-31',
       cursor: 'cursor123',
     });
+  });
+
+  it('manda factura y revisado solo cuando tienen contenido', () => {
+    expect(
+      parametrosPagos({
+        ...FILTROS_INICIALES_PAGOS,
+        factura: '  ramirez  ',
+        revisado_desde: '2026-03-01',
+        revisado_hasta: '2026-03-31',
+      }),
+    ).toEqual({
+      limit: 20,
+      factura: 'ramirez',
+      revisado_desde: '2026-03-01',
+      revisado_hasta: '2026-03-31',
+    });
+    expect(parametrosPagos({ ...FILTROS_INICIALES_PAGOS, factura: '   ' })).toEqual({ limit: 20 });
   });
 
   it('la bandeja es el filtro estado=pendiente', () => {
@@ -121,13 +146,18 @@ describe('conFiltroPagos (controles → estado)', () => {
     expect(conFiltroPagos(FILTROS_INICIALES_PAGOS, 'estado', 'verificado').estado).toBe('verificado');
     expect(conFiltroPagos(FILTROS_INICIALES_PAGOS, 'estado', '').estado).toBeNull();
     expect(conFiltroPagos(FILTROS_INICIALES_PAGOS, 'desde', '2026-02-01').desde).toBe('2026-02-01');
+    // Los filtros nuevos (factura/revisado) usan el mismo camino genérico.
+    expect(conFiltroPagos(FILTROS_INICIALES_PAGOS, 'factura', 'ramírez').factura).toBe('ramírez');
+    expect(conFiltroPagos(FILTROS_INICIALES_PAGOS, 'revisado_hasta', '2026-04-01').revisado_hasta).toBe(
+      '2026-04-01',
+    );
     // No pisa los demás filtros.
     const conEstado = { ...FILTROS_INICIALES_PAGOS, estado: 'pendiente' as const };
     expect(conFiltroPagos(conEstado, 'hasta', '2026-03-01').estado).toBe('pendiente');
   });
 });
 
-describe('meses cobrables y años', () => {
+describe('meses cobrables y matrícula por nadador', () => {
   it('febrero a diciembre, sin enero (lo cubre la matrícula)', () => {
     expect(MESES_COBRABLES).toHaveLength(11);
     expect(MESES_COBRABLES).not.toContain('01');
@@ -135,10 +165,48 @@ describe('meses cobrables y años', () => {
     expect(MESES_COBRABLES).toContain('12');
   });
 
-  it('ofrece año actual y anterior', () => {
-    const [actual, anterior] = aniosRegistro();
-    expect(actual).toBe(new Date().getFullYear());
-    expect(anterior).toBe(actual - 1);
+  it('los meses disponibles arrancan en el mes de ingreso (nada previo)', () => {
+    const anioActual = new Date().getFullYear();
+    const grupos = mesesCobrablesDe(`${anioActual - 1}-10-26`);
+    // Grupo del año de ingreso: desde octubre (mes >= 10), sin enero.
+    expect(grupos[0]!.anio).toBe(anioActual - 1);
+    expect(grupos[0]!.claves).toContain(`${anioActual - 1}-10`);
+    expect(grupos[0]!.claves).toContain(`${anioActual - 1}-12`);
+    expect(grupos[0]!.claves).not.toContain(`${anioActual - 1}-09`);
+    expect(grupos[0]!.claves).not.toContain(`${anioActual - 1}-01`);
+    // Todos los facturables del año en curso, sin meses futuros de años previos.
+    expect(grupos.at(-1)!.anio).toBe(anioActual);
+    expect(grupos.at(-1)!.claves).toHaveLength(11);
+  });
+
+  it('ingreso en enero ofrece todo el año; ingreso en diciembre solo ese mes', () => {
+    const anioActual = new Date().getFullYear();
+    const enero = mesesCobrablesDe(`${anioActual}-01-15`);
+    expect(enero).toHaveLength(1);
+    expect(enero[0]!.claves).toHaveLength(11);
+
+    const diciembre = mesesCobrablesDe(`${anioActual}-12-05`);
+    expect(diciembre).toHaveLength(1);
+    expect(diciembre[0]!.claves).toEqual([`${anioActual}-12`]);
+  });
+
+  it('la matrícula se ofrece solo si el nadador ya había ingresado en ese enero', () => {
+    const anioActual = new Date().getFullYear();
+    // Ingresó en octubre: enero de ese año ya pasó → solo los años siguientes.
+    expect(aniosMatriculaDe(`${anioActual - 1}-10-26`)).toEqual([anioActual]);
+    // Ingresó en enero: la matrícula de ese año sí corresponde.
+    expect(aniosMatriculaDe(`${anioActual}-01-15`)).toEqual([anioActual]);
+    // Ingresó hace dos años: todos los eneros desde entonces.
+    expect(aniosMatriculaDe(`${anioActual - 2}-06-01`)).toEqual([
+      anioActual - 1,
+      anioActual,
+    ]);
+  });
+
+  it('etiquetaMesAnio muestra el año para no confundir 2025 con 2026', () => {
+    expect(etiquetaMesAnio('2025-11')).toBe('Nov 2025');
+    expect(etiquetaMesAnio('2026-02')).toBe('Feb 2026');
+    expect(etiquetaMesAnio('2026-09')).toBe('Sep 2026');
   });
 });
 
@@ -177,9 +245,9 @@ describe('sugerenciasDe (espejo del backend)', () => {
   });
 });
 
-describe('lineasDesde (día 1 y cruce nadador × meses)', () => {
-  it('cruza selecciones × meses con fecha día 1', () => {
-    const lineas = lineasDesde([seleccion()], ['03', '07'], false, 2026);
+describe('lineasDesde (día 1 y selección POR nadador)', () => {
+  it('cada nadador aporta sus meses con fecha día 1', () => {
+    const lineas = lineasDesde([seleccion('0', ['2026-03', '2026-07'])]);
     expect(lineas).toEqual([
       {
         afiliado_id: UUID_AFILIADO,
@@ -196,8 +264,8 @@ describe('lineasDesde (día 1 y cruce nadador × meses)', () => {
     ]);
   });
 
-  it('la matrícula cae el 1 de enero del año elegido', () => {
-    const lineas = lineasDesde([seleccion()], [], true, 2025);
+  it('la matrícula cae el 1 de enero del año elegido por ese nadador', () => {
+    const lineas = lineasDesde([seleccion('0', [], 2025)]);
     expect(lineas).toEqual([
       {
         afiliado_id: UUID_AFILIADO,
@@ -208,18 +276,33 @@ describe('lineasDesde (día 1 y cruce nadador × meses)', () => {
     ]);
   });
 
-  it('sin selecciones o sin meses ni matrícula no hay líneas', () => {
-    expect(lineasDesde([], ['03'], false, 2026)).toEqual([]);
-    expect(lineasDesde([seleccion()], [], false, 2026)).toEqual([]);
+  it('sin nadadores o sin meses ni matrícula no hay líneas', () => {
+    expect(lineasDesde([])).toEqual([]);
+    expect(lineasDesde([seleccion()])).toEqual([]);
   });
 
-  it('dos nadadores × tres meses = seis líneas', () => {
+  it('mezcla meses de años distintos en un mismo pago (dic-25 + feb-26)', () => {
+    const anioActual = new Date().getFullYear();
+    const lineas = lineasDesde([
+      seleccion('0', [`${anioActual}-02`, `${anioActual - 1}-12`]),
+    ]);
+    expect(lineas.map((linea) => linea.fecha_cobertura)).toEqual([
+      `${anioActual - 1}-12-01`, // cronológico, pese a venir de un año previo
+      `${anioActual}-02-01`,
+    ]);
+  });
+
+  it('dos nadadores con meses distintos = la suma de sus líneas', () => {
     const otro: SeleccionAfiliado = {
-      afiliado: { ...afiliado(), id: '55555555-5555-4555-8555-555555555555' },
-      valorMensual: '30000.00',
-      valorMatricula: '70000.00',
+      ...nuevaSeleccion(
+        { ...afiliado(), id: '55555555-5555-4555-8555-555555555555' },
+        plan('30000.00', '70000.00'),
+      ),
+      meses: ['2026-02', '2026-03', '2026-04'],
     };
-    expect(lineasDesde([seleccion(), otro], ['02', '03', '04'], false, 2026)).toHaveLength(6);
+    expect(
+      lineasDesde([seleccion('0', ['2026-02']), otro]),
+    ).toHaveLength(4);
   });
 });
 
@@ -234,13 +317,17 @@ describe('totalLineas (decimal.js, nunca `+`)', () => {
   });
 
   it('once mensualidades dan exactos y con 2 decimales', () => {
-    const lineas = lineasDesde([seleccion()], MESES_COBRABLES, false, 2026);
+    const anio = new Date().getFullYear();
+    const lineas = lineasDesde([
+      seleccion('0', MESES_COBRABLES.map((mes) => `${anio}-${mes}`)),
+    ]);
     expect(lineas).toHaveLength(11);
     expect(totalLineas(lineas)).toBe('385000.00');
   });
 
   it('incluye la matrícula y devuelve 0.00 sin líneas', () => {
-    const lineas = lineasDesde([seleccion()], ['12'], true, 2026);
+    const anio = new Date().getFullYear();
+    const lineas = lineasDesde([seleccion('0', [`${anio}-12`], anio)]);
     expect(totalLineas(lineas)).toBe('115000.00');
     expect(totalLineas([])).toBe('0.00');
   });

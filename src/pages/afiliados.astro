@@ -9,8 +9,16 @@ const estado = Astro.url.searchParams.get('estado');
 const estadoValido =
   estado === 'al_dia' || estado === 'por_vencer' || estado === 'en_mora' ? estado : null;
 const q = Astro.url.searchParams.get('q') ?? '';
+const orden = Astro.url.searchParams.get('orden') === 'documento' ? 'documento' : 'nombre';
+const direccion = Astro.url.searchParams.get('direccion') === 'desc' ? 'desc' : 'asc';
 ---
 
 <AppLayout titulo="Afiliados">
-  <Afiliados client:load estadoInicial={estadoValido} qInicial={q} />
+  <Afiliados
+    client:load
+    estadoInicial={estadoValido}
+    qInicial={q}
+    ordenInicial={orden}
+    direccionInicial={direccion}
+  />
 </AppLayout>

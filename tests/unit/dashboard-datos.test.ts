@@ -20,8 +20,8 @@ describe('etiquetas de mes (es-CO)', () => {
   it('etiqueta corta, larga y chip', () => {
     expect(etiquetaMes('2026-09')).toBe('sept.');
     expect(etiquetaMesLarga('2026-09')).toBe('septiembre de 2026');
-    expect(etiquetaMesChip('2026-09')).toBe('sept');
-    expect(etiquetaMesChip('2025-11')).toBe('nov');
+    expect(etiquetaMesChip('2026-09')).toBe('sept 2026');
+    expect(etiquetaMesChip('2025-11')).toBe('nov 2025');
     // Cruce de año: la clave manda, no el año actual.
     expect(etiquetaMesLarga('2025-11')).toBe('noviembre de 2025');
   });

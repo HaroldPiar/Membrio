@@ -117,6 +117,12 @@ export const afiliadoFiltrosSchema = paginacionQuerySchema.extend({
   estado_pago: estadoPagoSchema.optional().openapi({
     description: 'Requiere calcular el estado de cada afiliado; solo afiliados activos',
   }),
+  orden: z.enum(['nombre', 'documento']).default('nombre').openapi({
+    description: 'Campo de orden del listado; por defecto nombre',
+  }),
+  direccion: z.enum(['asc', 'desc']).default('asc').openapi({
+    description: 'Dirección del orden; por defecto ascendente',
+  }),
 });
 
 export const retiroSchema = z

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   FILTROS_INICIALES,
+  alternarOrden,
   conFiltro,
   filtrosAUrl,
   parametrosListado,
@@ -43,13 +44,22 @@ function EsqueletoListado() {
 export function Afiliados({
   estadoInicial,
   qInicial,
+  ordenInicial,
+  direccionInicial,
 }: {
   estadoInicial: EstadoPagoAfiliado | null;
   qInicial: string;
+  ordenInicial?: 'nombre' | 'documento' | undefined;
+  direccionInicial?: 'asc' | 'desc' | undefined;
 }) {
   return (
     <ProveedorConsultas>
-      <ContenidoAfiliados estadoInicial={estadoInicial} qInicial={qInicial} />
+      <ContenidoAfiliados
+        estadoInicial={estadoInicial}
+        qInicial={qInicial}
+        ordenInicial={ordenInicial}
+        direccionInicial={direccionInicial}
+      />
     </ProveedorConsultas>
   );
 }
@@ -57,14 +67,20 @@ export function Afiliados({
 function ContenidoAfiliados({
   estadoInicial,
   qInicial,
+  ordenInicial,
+  direccionInicial,
 }: {
   estadoInicial: EstadoPagoAfiliado | null;
   qInicial: string;
+  ordenInicial?: 'nombre' | 'documento' | undefined;
+  direccionInicial?: 'asc' | 'desc' | undefined;
 }) {
   const [filtros, setFiltros] = useState<FiltrosAfiliados>({
     ...FILTROS_INICIALES,
     estado_pago: estadoInicial,
     q: qInicial,
+    orden: ordenInicial ?? 'nombre',
+    direccion: direccionInicial ?? 'asc',
   });
   const [texto, setTexto] = useState(qInicial);
   const [pila, setPila] = useState<string[]>([]);
@@ -207,6 +223,7 @@ function ContenidoAfiliados({
           filas={lista.data.datos}
           filtros={filtros}
           onFiltro={(campo, valor) => cambiarFiltros((previo) => conFiltro(previo, campo, valor))}
+          onOrden={(campo) => cambiarFiltros((previo) => alternarOrden(previo, campo))}
           onSeleccionar={setSeleccion}
           planes={planes.data?.datos ?? []}
           categorias={categorias.data?.datos ?? []}

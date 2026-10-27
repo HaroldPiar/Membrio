@@ -1,6 +1,7 @@
 /**
  * /api/v1/afiliados (spec §9):
- *   GET    filtros q/activo/categoria/plan/estado_pago + paginación limit/cursor
+ *   GET    filtros q/activo/categoria/plan/estado_pago + orden/direccion +
+ *          paginación limit/cursor
  *   POST   alta (admin y operador)
  *   GET    detalle por id
  *   PATCH  edición (admin y operador)
@@ -112,10 +113,19 @@ rutasAfiliados.openapi(rutaListar, async (c) => {
     categoria: q.categoria,
     plan: q.plan,
     estado_pago: q.estado_pago,
+    orden: q.orden,
+    direccion: q.direccion,
     cursor: decodificarCursor(q.cursor),
     limit: limiteConDetras(q.limit),
   });
-  return c.json(serializar(listado, paginar(filas, q.limit, (f) => f.nombre)), 200);
+  // La clave del cursor es el valor de la columna por la que se ordena.
+  return c.json(
+    serializar(
+      listado,
+      paginar(filas, q.limit, (f) => (q.orden === 'documento' ? f.numeroDocumento : f.nombre)),
+    ),
+    200,
+  );
 });
 
 rutasAfiliados.openapi(rutaCrear, async (c) => {

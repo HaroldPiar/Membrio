@@ -1,8 +1,9 @@
 /**
- * Tabla de afiliados con TanStack Table (Spec del cliente §5) y filtros en el
- * encabezado de las columnas categóricas (§4.3: Categoría, Plan, Estado de
- * pago y Activo). El orden y la paginación los hace la API (nombre ASC con
- * cursor opaco): la tabla solo renderiza — sin orden client-side.
+ * Tabla de afiliados con TanStack Table (Spec del cliente §5): filtros de
+ * encabezado en las columnas categóricas (§4.3: Categoría, Plan, Estado de
+ * pago y Activo) y ORDEN por encabezado en Afiliado y Documento (asc/desc,
+ * A-Z ⇄ Z-A). El orden y la paginación los hace la API (cursor opaco): la
+ * tabla solo renderiza — sin orden ni paginación client-side.
  */
 import {
   flexRender,
@@ -10,22 +11,58 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { useMemo } from 'react';
 
 import {
   ETIQUETAS_ESTADO_PAGO,
   type Afiliado,
+  type DireccionOrden,
   type FiltrosAfiliados,
+  type OrdenAfiliado,
 } from '../../lib/afiliados-datos';
 import { cn } from '../../lib/cn';
 import type { Categoria, Plan } from '../../lib/consultas-afiliados';
 import { EstadoPago } from '../ui/estado-pago';
 import { FiltroColumna, type OpcionFiltro } from '../ui/filtro-columna';
 
+/** Encabezado ordenable: clic alterna ASC ⇄ DESC (A-Z / Z-A). */
+function EncabezadoOrden({
+  etiqueta,
+  campo,
+  orden,
+  direccion,
+  onOrden,
+}: {
+  etiqueta: string;
+  campo: OrdenAfiliado;
+  orden: OrdenAfiliado;
+  direccion: DireccionOrden;
+  onOrden: (campo: OrdenAfiliado) => void;
+}) {
+  const activo = orden === campo;
+  const Icono = !activo ? ChevronsUpDown : direccion === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onOrden(campo)}
+      aria-label={`Ordenar por ${etiqueta}`}
+      className={cn(
+        'inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors hover:text-primary',
+        activo ? 'text-primary' : 'text-muted-foreground',
+      )}
+    >
+      {etiqueta}
+      <Icono className="h-3 w-3" aria-hidden="true" />
+    </button>
+  );
+}
+
 export function TablaAfiliados({
   filas,
   filtros,
   onFiltro,
+  onOrden,
   onSeleccionar,
   planes,
   categorias,
@@ -33,6 +70,7 @@ export function TablaAfiliados({
   filas: Afiliado[];
   filtros: FiltrosAfiliados;
   onFiltro: (campo: 'activo' | 'categoria' | 'plan' | 'estado_pago', valor: string) => void;
+  onOrden: (campo: OrdenAfiliado) => void;
   onSeleccionar: (id: string) => void;
   planes: Plan[];
   categorias: Categoria[];
@@ -59,7 +97,15 @@ export function TablaAfiliados({
   const columnas: ColumnDef<Afiliado>[] = [
     {
       accessorKey: 'nombre',
-      header: 'Afiliado',
+      header: () => (
+        <EncabezadoOrden
+          etiqueta="Afiliado"
+          campo="nombre"
+          orden={filtros.orden}
+          direccion={filtros.direccion}
+          onOrden={onOrden}
+        />
+      ),
       cell: ({ row }) => (
         <div className="min-w-0">
           <p className="truncate font-medium">{row.original.nombre}</p>
@@ -69,7 +115,15 @@ export function TablaAfiliados({
     },
     {
       accessorKey: 'numero_documento',
-      header: 'Documento',
+      header: () => (
+        <EncabezadoOrden
+          etiqueta="Documento"
+          campo="documento"
+          orden={filtros.orden}
+          direccion={filtros.direccion}
+          onOrden={onOrden}
+        />
+      ),
       cell: ({ row }) => (
         <span className="whitespace-nowrap tabular-nums">
           <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">

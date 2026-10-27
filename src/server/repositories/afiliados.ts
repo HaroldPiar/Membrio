@@ -7,20 +7,25 @@
  *    (Truchas: cientos de filas); si crece, migrar a vista materializada (§8.4).
  *  - `mesesPagadosVerificados` vive en repositories/pagos.ts (es dato de pagos).
  */
-import { and, asc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 
 import { db } from '../db/client';
 import { afiliados, planes } from '../db/schema';
 import type { ContextoTenant } from '../middleware/auth';
 import type { Cursor } from '../../shared/paginacion';
 import type { Opcionales } from '../../shared/casing';
-import { cursorMayor } from './cursor';
+import { cursorMayor, cursorMenor } from './cursor';
+
+export type OrdenAfiliado = 'nombre' | 'documento';
+export type DireccionOrden = 'asc' | 'desc';
 
 export type FiltrosAfiliados = {
   q?: string | undefined;
   activo?: boolean | undefined;
   categoria?: string | undefined;
   plan?: string | undefined;
+  orden?: OrdenAfiliado | undefined;
+  direccion?: DireccionOrden | undefined;
   cursor?: Cursor | undefined;
   limit: number;
   /** true = traer todas las filas que cumplan los filtros de SQL (el corte lo hace el service). */
@@ -31,6 +36,11 @@ export type DatosAfiliado = Omit<
   typeof afiliados.$inferInsert,
   'id' | 'organizacionId' | 'fechaRetiro' | 'motivoRetiro' | 'activo' | 'createdAt' | 'updatedAt'
 >;
+
+/** Columna de orden: nombre (por defecto) o número de documento. */
+function columnaOrden(orden: OrdenAfiliado | undefined) {
+  return orden === 'documento' ? afiliados.numeroDocumento : afiliados.nombre;
+}
 
 function condicionesListado(filtros: FiltrosAfiliados): (SQL | undefined)[] {
   const condiciones: (SQL | undefined)[] = [];
@@ -43,7 +53,14 @@ function condicionesListado(filtros: FiltrosAfiliados): (SQL | undefined)[] {
   if (filtros.activo !== undefined) condiciones.push(eq(afiliados.activo, filtros.activo));
   if (filtros.categoria) condiciones.push(eq(afiliados.categoriaId, filtros.categoria));
   if (filtros.plan) condiciones.push(eq(afiliados.planId, filtros.plan));
-  if (filtros.cursor) condiciones.push(cursorMayor(afiliados.nombre, afiliados.id, filtros.cursor));
+  if (filtros.cursor) {
+    const clave = columnaOrden(filtros.orden);
+    condiciones.push(
+      filtros.direccion === 'desc'
+        ? cursorMenor(clave, afiliados.id, filtros.cursor)
+        : cursorMayor(clave, afiliados.id, filtros.cursor),
+    );
+  }
   return condiciones;
 }
 
@@ -55,11 +72,16 @@ export async function listarAfiliados(
     eq(afiliados.organizacionId, ctx.organizacionId),
     ...condicionesListado(filtros),
   ];
+  const clave = columnaOrden(filtros.orden);
+  const orden =
+    filtros.direccion === 'desc'
+      ? [desc(clave), desc(afiliados.id)]
+      : [asc(clave), asc(afiliados.id)];
   return db
     .select()
     .from(afiliados)
     .where(and(...condiciones))
-    .orderBy(asc(afiliados.nombre), asc(afiliados.id))
+    .orderBy(...orden)
     .limit(filtros.sinLimiteSQL ? 5000 : filtros.limit);
 }
 
@@ -112,14 +134,17 @@ export async function retirarAfiliado(
     .returning();
 }
 
-/** Subconjunto de `ids` que existen en la organización (validación de pertenencia en pagos). */
-export async function idsExistentes(ctx: ContextoTenant, ids: string[]): Promise<Set<string>> {
-  if (ids.length === 0) return new Set();
+/** Fechas de ingreso de los `ids` existentes en la organización (pertenencia + cobertura en pagos). */
+export async function fechaIngresoPorId(
+  ctx: ContextoTenant,
+  ids: string[],
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
   const filas = await db
-    .select({ id: afiliados.id })
+    .select({ id: afiliados.id, fechaIngreso: afiliados.fechaIngreso })
     .from(afiliados)
     .where(and(eq(afiliados.organizacionId, ctx.organizacionId), inArray(afiliados.id, ids)));
-  return new Set(filas.map((f) => f.id));
+  return new Map(filas.map((fila) => [fila.id, fila.fechaIngreso]));
 }
 
 /** Conteo por `activo` (dashboard: total vs retirados). */

@@ -1,8 +1,9 @@
 /**
  * Isla de /pagos (Spec del cliente §4.4): tres pestañas — Por verificar
- * (bandeja diaria), Historial (filtros por estado y fecha) y Cartera — con
- * paginación por cursor y panel de detalle. Una sola isla para que las
- * consultas compartan el mismo QueryClient.
+ * (bandeja diaria), Historial (filtros en los encabezados de columna: estado,
+ * fecha única/rango de registro, factura por texto y fecha de revisión) y
+ * Cartera — con paginación por cursor y panel de detalle. Una sola isla para
+ * que las consultas compartan el mismo QueryClient.
  *
  * A diferencia de /afiliados, los filtros NO se reflejan en la URL: el
  * contrato de fase no lo pide y la pestaña activa tampoco — decisión 31.
@@ -17,14 +18,13 @@ import {
   FILTROS_INICIALES_PAGOS,
   FILTROS_PENDIENTES,
   conFiltroPagos,
+  hayFiltrosPagos,
   parametrosPagos,
   type FiltrosPagos,
 } from '../../lib/pagos-datos';
 import { Boton } from '../ui/boton';
-import { CampoTexto } from '../ui/campo-texto';
 import { EstadoVacio } from '../ui/estado-vacio';
 import { ErrorConsulta } from '../ui/error-consulta';
-import { Campo } from '../ui/campo';
 import { ProveedorConsultas } from '../ui/proveedor-consultas';
 import { PanelPago } from './panel-pago';
 import { TabCartera } from './tab-cartera';
@@ -102,7 +102,7 @@ function ContenidoPagos() {
   }, [seleccionado]);
 
   const pendientes = resumen.data?.pagos.pendientes ?? 0;
-  const hayFiltros = filtros.estado !== null || filtros.desde !== '' || filtros.hasta !== '';
+  const hayFiltros = hayFiltrosPagos(filtros);
 
   const siguiente = lista.data?.paginacion.cursor_siguiente ?? null;
   const retroceder = () => setPila((anterior) => anterior.slice(0, -1));
@@ -156,28 +156,11 @@ function ContenidoPagos() {
               Pagos esperando verificación. Abre uno para ver el comprobante y decidir.
             </p>
           ) : (
-            <div className="flex flex-wrap items-end gap-3">
-              <Campo id="filtro-desde" etiqueta="Registrado desde">
-                <CampoTexto
-                  id="filtro-desde"
-                  type="date"
-                  value={filtros.desde}
-                  onChange={(evento) =>
-                    cambiarFiltros((previo) => conFiltroPagos(previo, 'desde', evento.target.value))
-                  }
-                />
-              </Campo>
-              <Campo id="filtro-hasta" etiqueta="Registrado hasta">
-                <CampoTexto
-                  id="filtro-hasta"
-                  type="date"
-                  value={filtros.hasta}
-                  onChange={(evento) =>
-                    cambiarFiltros((previo) => conFiltroPagos(previo, 'hasta', evento.target.value))
-                  }
-                />
-              </Campo>
-              {hayFiltros && (
+            hayFiltros && (
+              <div className="flex flex-wrap items-end gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Filtros activos en los encabezados de las columnas.
+                </p>
                 <Boton
                   variante="fantasma"
                   tamano="chico"
@@ -186,8 +169,8 @@ function ContenidoPagos() {
                   <Search className="h-3.5 w-3.5" aria-hidden="true" />
                   Limpiar filtros
                 </Boton>
-              )}
-            </div>
+              </div>
+            )
           )}
 
           {lista.isError ? (

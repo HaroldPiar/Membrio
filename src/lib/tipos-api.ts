@@ -1295,6 +1295,10 @@ export interface paths {
                     plan?: string;
                     /** @description Requiere calcular el estado de cada afiliado; solo afiliados activos */
                     estado_pago?: "al_dia" | "por_vencer" | "en_mora";
+                    /** @description Campo de orden del listado; por defecto nombre */
+                    orden?: "nombre" | "documento";
+                    /** @description Dirección del orden; por defecto ascendente */
+                    direccion?: "asc" | "desc";
                 };
                 header?: never;
                 path?: never;
@@ -1947,6 +1951,12 @@ export interface paths {
                     desde?: string;
                     /** @description Filtrar por fecha de creación <= hasta */
                     hasta?: string;
+                    /** @description Búsqueda parcial (case-insensitive) en factura_nombre o factura_documento */
+                    factura?: string;
+                    /** @description Filtrar por revisado_en >= revisado_desde */
+                    revisado_desde?: string;
+                    /** @description Filtrar por revisado_en <= revisado_hasta */
+                    revisado_hasta?: string;
                 };
                 header?: never;
                 path?: never;

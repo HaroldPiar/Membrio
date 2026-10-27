@@ -109,6 +109,16 @@ export const pagoCreacionSchema = z
           message: 'Una línea de matrícula debe tener fecha_cobertura = 1 de enero del año',
         });
       }
+      // Mensualidad: enero no es facturable — lo cubre la matrícula. Sin
+      // este corte la API aceptaría cobrar un mes que el estado de pago
+      // (§8.3) nunca evalúa: el pago se verificaría sin efecto en la deuda.
+      if (linea.concepto === 'mensualidad' && mes === 1) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [...ruta, 'fecha_cobertura'],
+          message: 'Una mensualidad no puede cubrir enero: enero lo cubre la matrícula',
+        });
+      }
 
       const llave = `${linea.afiliado_id}|${linea.concepto}|${linea.fecha_cobertura}`;
       if (vistas.has(llave)) {
@@ -151,4 +161,35 @@ export const pagoFiltrosSchema = paginacionQuerySchema.extend({
   afiliado: idSchema.optional(),
   desde: fecha.optional().openapi({ description: 'Filtrar por fecha de creación >= desde' }),
   hasta: fecha.optional().openapi({ description: 'Filtrar por fecha de creación <= hasta' }),
+  factura: z.string().trim().min(1).max(120).optional().openapi({
+    description: 'Búsqueda parcial (case-insensitive) en factura_nombre o factura_documento',
+    example: 'ramirez',
+  }),
+  revisado_desde: fecha.optional().openapi({ description: 'Filtrar por revisado_en >= revisado_desde' }),
+  revisado_hasta: fecha.optional().openapi({ description: 'Filtrar por revisado_en <= revisado_hasta' }),
 });
+
+/** 'AAAA-MM-DD' → 'AAAA-MM' (clave de mes de ingreso/cobertura). */
+export function mesDeFecha(fecha: string): string {
+  return fecha.slice(0, 7);
+}
+
+/**
+ * Líneas cuya cobertura es ANTERIOR al mes de ingreso del nadador (spec:
+ * no se cobra nada previo a la inscripción — regla igual para mensualidad
+ * y matrícula). Pure: la API la usa en el service con las fechas de la
+ * base; el cliente no la necesita porque ya filtra los meses ofrecidos.
+ */
+export function lineasAnterioresAlIngreso(
+  lineas: readonly { afiliado_id: string; fecha_cobertura: string }[],
+  ingresoPorAfiliado: ReadonlyMap<string, string>,
+): { afiliado_id: string; fecha_cobertura: string; fecha_ingreso: string }[] {
+  const anteriores: { afiliado_id: string; fecha_cobertura: string; fecha_ingreso: string }[] = [];
+  for (const linea of lineas) {
+    const ingreso = ingresoPorAfiliado.get(linea.afiliado_id);
+    if (ingreso && mesDeFecha(linea.fecha_cobertura) < mesDeFecha(ingreso)) {
+      anteriores.push({ ...linea, fecha_ingreso: ingreso });
+    }
+  }
+  return anteriores;
+}

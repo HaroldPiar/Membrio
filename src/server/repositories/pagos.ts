@@ -5,7 +5,7 @@
  * (que puede liberar líneas) son operaciones multi-tabla SIEMPRE en
  * transacción. El estado de los pagos solo cambia por estas vías.
  */
-import { and, asc, desc, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 
 import { db } from '../db/client';
 import { pagoDetalle, pagos } from '../db/schema';
@@ -39,24 +39,39 @@ export type FiltrosPagos = {
   /** AAAA-MM-DD sobre created_at. */
   desde?: string | undefined;
   hasta?: string | undefined;
+  /** Texto parcial sobre factura_nombre o factura_documento. */
+  factura?: string | undefined;
+  /** AAAA-MM-DD sobre revisado_en. */
+  revisadoDesde?: string | undefined;
+  revisadoHasta?: string | undefined;
   cursor?: Cursor | undefined;
   limit: number;
 };
 
+/** Inicio del día (00:00 BOG) como instante UTC. */
+function inicioDiaBo(fecha: string): Date {
+  return new Date(`${fecha}T05:00:00Z`);
+}
+
+/** Fin del día (23:59:59.999 BOG) como instante UTC — inclusivo. */
+function finDiaBo(fecha: string): Date {
+  const limite = new Date(`${fecha}T00:00:00Z`);
+  limite.setUTCDate(limite.getUTCDate() + 1);
+  limite.setUTCHours(4, 59, 59, 999);
+  return limite;
+}
+
 function condicionesListado(filtros: FiltrosPagos): (SQL | undefined)[] {
   const condiciones: (SQL | undefined)[] = [];
   if (filtros.estado) condiciones.push(eq(pagos.estado, filtros.estado));
-  if (filtros.desde) {
-    // Día completo en zona America/Bogota (UTC-5 sin DST): desde 00:00 BOG.
-    condiciones.push(gte(pagos.createdAt, new Date(`${filtros.desde}T05:00:00Z`)));
+  if (filtros.desde) condiciones.push(gte(pagos.createdAt, inicioDiaBo(filtros.desde)));
+  if (filtros.hasta) condiciones.push(lte(pagos.createdAt, finDiaBo(filtros.hasta)));
+  if (filtros.factura) {
+    const patron = `%${filtros.factura.replace(/[\\%_]/g, '\\$&')}%`;
+    condiciones.push(or(ilike(pagos.facturaNombre, patron), ilike(pagos.facturaDocumento, patron)));
   }
-  if (filtros.hasta) {
-    // Inclusivo: hasta 23:59:59.999 BOG = 04:59:59.999 UTC del día siguiente.
-    const limite = new Date(`${filtros.hasta}T00:00:00Z`);
-    limite.setUTCDate(limite.getUTCDate() + 1);
-    limite.setUTCHours(4, 59, 59, 999);
-    condiciones.push(lte(pagos.createdAt, limite));
-  }
+  if (filtros.revisadoDesde) condiciones.push(gte(pagos.revisadoEn, inicioDiaBo(filtros.revisadoDesde)));
+  if (filtros.revisadoHasta) condiciones.push(lte(pagos.revisadoEn, finDiaBo(filtros.revisadoHasta)));
   if (filtros.cursor) condiciones.push(cursorMenor(pagos.createdAt, pagos.id, filtros.cursor));
   return condiciones;
 }

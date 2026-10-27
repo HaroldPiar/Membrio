@@ -10,6 +10,7 @@ import {
   FILTROS_INICIALES,
   acudienteConContenido,
   acudienteParaEnviar,
+  alternarOrden,
   conFiltro,
   esquemaFormularioAfiliado,
   filtrosAUrl,
@@ -57,6 +58,8 @@ describe('parametrosListado', () => {
         categoria: UUID_CATEGORIA,
         plan: '',
         estado_pago: 'en_mora',
+        orden: 'nombre',
+        direccion: 'asc',
       },
       'cursor123',
     );
@@ -69,6 +72,40 @@ describe('parametrosListado', () => {
       cursor: 'cursor123',
     });
     expect(parametros).not.toHaveProperty('plan');
+  });
+
+  it('omite el orden por defecto y manda solo el orden activo', () => {
+    expect(parametrosListado({ ...FILTROS_INICIALES, orden: 'documento', direccion: 'desc' })).toEqual({
+      limit: 20,
+      orden: 'documento',
+      direccion: 'desc',
+    });
+    expect(parametrosListado({ ...FILTROS_INICIALES, orden: 'documento' })).toEqual({
+      limit: 20,
+      orden: 'documento',
+    });
+  });
+});
+
+describe('alternarOrden (clic en encabezado)', () => {
+  it('activa un campo nuevo en ASC y luego alterna ASC ⇄ DESC', () => {
+    const porDocumento = alternarOrden(FILTROS_INICIALES, 'documento');
+    expect(porDocumento.orden).toBe('documento');
+    expect(porDocumento.direccion).toBe('asc');
+
+    const desc = alternarOrden(porDocumento, 'documento');
+    expect(desc.direccion).toBe('desc');
+
+    const vuelveAsc = alternarOrden(desc, 'documento');
+    expect(vuelveAsc.direccion).toBe('asc');
+  });
+
+  it('cambiar de campo vuelve a ASC y no toca los demás filtros', () => {
+    const conQ = { ...FILTROS_INICIALES, q: 'pep', orden: 'documento' as const, direccion: 'desc' as const };
+    const porNombre = alternarOrden(conQ, 'nombre');
+    expect(porNombre.orden).toBe('nombre');
+    expect(porNombre.direccion).toBe('asc');
+    expect(porNombre.q).toBe('pep');
   });
 });
 
@@ -99,10 +136,23 @@ describe('filtros ↔ URL', () => {
       estado_pago: 'en_mora',
       q: '',
       activo: null,
+      orden: 'nombre',
+      direccion: 'asc',
     });
     expect(filtrosDeUrl(new URLSearchParams('estado=otra_cosa')).estado_pago).toBeNull();
     expect(filtrosDeUrl(new URLSearchParams('activo=false')).activo).toBe(false);
     expect(filtrosDeUrl(new URLSearchParams('q= ana ')).q).toBe(' ana ');
+    expect(filtrosDeUrl(new URLSearchParams('orden=documento&direccion=desc'))).toMatchObject({
+      orden: 'documento',
+      direccion: 'desc',
+    });
+    expect(filtrosDeUrl(new URLSearchParams('orden=raro&direccion=alto')).direccion).toBe('asc');
+  });
+
+  it('escribe el orden no por defecto en la URL', () => {
+    expect(filtrosAUrl({ ...FILTROS_INICIALES, orden: 'documento', direccion: 'desc' })).toBe(
+      '/afiliados?orden=documento&direccion=desc',
+    );
   });
 });
 

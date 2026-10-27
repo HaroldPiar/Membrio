@@ -2,17 +2,20 @@
  * Servicio de pagos (spec §8.1): creación en transacción con validaciones,
  * y verificación/rechazo con liberación de líneas.
  *
- * Validaciones de FORMA (día 1, matrícula en enero, duplicados internos,
- * monto_total == suma) viven en Zod (src/shared/pagos.ts) y ya corren antes
- * de llegar acá. Acá se agregan las que requieren consultar la base:
+ * Validaciones de FORMA (día 1, matrícula en enero, enero sin mensualidad,
+ * duplicados internos, monto_total == suma) viven en Zod (src/shared/pagos.ts)
+ * y ya corren antes de llegar acá. Acá se agregan las que requieren consultar
+ * la base:
  *  - cada afiliado debe pertenecer al tenant → si falta alguno: 404
  *    (indistinguible de "no existe", spec §5.4);
+ *  - ninguna cobertura puede ser anterior al mes de ingreso del nadador → 400;
  *  - no puede existir ya una línea para (afiliado, concepto, fecha) → 409.
  */
 import { AppError, noEncontrado } from '../errors';
 import type { ContextoTenant } from '../middleware/auth';
 import * as reposAfiliados from '../repositories/afiliados';
 import * as reposPagos from '../repositories/pagos';
+import { lineasAnterioresAlIngreso } from '../../shared/pagos';
 
 export type PagoConLineas = Awaited<ReturnType<typeof obtenerPago>>;
 
@@ -34,10 +37,27 @@ export async function crearPago(
   const { lineas, ...pago } = datos;
 
   const ids = [...new Set(lineas.map((l) => l.afiliadoId))];
-  const existentes = await reposAfiliados.idsExistentes(ctx, ids);
-  if (existentes.size !== ids.length) {
+  const ingresos = await reposAfiliados.fechaIngresoPorId(ctx, ids);
+  if (ingresos.size !== ids.length) {
     // Algún afiliado no es de esta organización (o no existe): 404 uniforme.
     throw noEncontrado('Afiliado');
+  }
+
+  // Ninguna cobertura puede ser anterior al mes de ingreso del nadador: la
+  // cartera (§8.3) nunca adeuda meses previos a la inscripción, así que un
+  // pago así se verificaría sin efecto sobre la deuda.
+  const anteriores = lineasAnterioresAlIngreso(
+    lineas.map((l) => ({ afiliado_id: l.afiliadoId, fecha_cobertura: l.fechaCobertura })),
+    ingresos,
+  );
+  if (anteriores.length > 0) {
+    const ejemplo = anteriores[0];
+    throw new AppError(
+      400,
+      'VALIDACION',
+      `Hay líneas anteriores al mes de ingreso del nadador (ingreso: ${ejemplo?.fecha_ingreso}): ` +
+        anteriores.map((l) => l.fecha_cobertura).slice(0, 5).join(', '),
+    );
   }
 
   if (await reposPagos.existenLineas(ctx, lineas)) {

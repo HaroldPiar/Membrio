@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { pagoCreacionSchema } from '../../src/shared/pagos';
+import { lineasAnterioresAlIngreso, pagoCreacionSchema } from '../../src/shared/pagos';
 import { retiroSchema } from '../../src/shared/afiliados';
 
 const AFILIADO_A = '3f6a1a3e-1111-4111-8111-000000000001';
@@ -92,6 +92,19 @@ describe('pagoCreacionSchema — rechazos', () => {
     expect(fallos(pago).join(' ')).toContain('1 de enero');
   });
 
+  it('mensualidad de enero se rechaza (enero lo cubre la matrícula)', () => {
+    const pago = {
+      monto_total: '74000.00',
+      factura_tipo_documento: 'CC',
+      factura_documento: '1234567890',
+      factura_nombre: 'Acme',
+      lineas: [
+        { afiliado_id: AFILIADO_A, concepto: 'mensualidad', fecha_cobertura: '2026-01-01', monto: '74000.00' },
+      ],
+    };
+    expect(fallos(pago).join(' ')).toContain('enero lo cubre la matrícula');
+  });
+
   it('líneas duplicadas (mismo afiliado, concepto y fecha) se rechazan', () => {
     const pago = pagoValido();
     pago.lineas[1]!.fecha_cobertura = '2026-02-01'; // idéntica a la primera
@@ -121,6 +134,39 @@ describe('pagoCreacionSchema — rechazos', () => {
   it('un pago sin líneas se rechaza', () => {
     const pago = { ...pagoValido(), lineas: [] };
     expect(fallos(pago).join(' ')).toContain('al menos una línea');
+  });
+});
+
+describe('lineasAnterioresAlIngreso (nada previo a la inscripción)', () => {
+  const ingresos = new Map([
+    ['harold', '2025-10-26'],
+    ['sofia', '2026-01-15'],
+  ]);
+
+  it('rechaza coberturas anteriores al mes de ingreso (mes comparado como clave)', () => {
+    const anteriores = lineasAnterioresAlIngreso(
+      [
+        { afiliado_id: 'harold', fecha_cobertura: '2025-08-01' }, // ← el bug reportado
+        { afiliado_id: 'harold', fecha_cobertura: '2025-10-01' }, // mes de ingreso: válida
+        { afiliado_id: 'sofia', fecha_cobertura: '2026-01-01' }, // ene de su ingreso: válida
+      ],
+      ingresos,
+    );
+    expect(anteriores).toEqual([
+      { afiliado_id: 'harold', fecha_cobertura: '2025-08-01', fecha_ingreso: '2025-10-26' },
+    ]);
+  });
+
+  it('la matrícula sigue la misma regla y un afiliado sin fecha se ignora', () => {
+    const anteriores = lineasAnterioresAlIngreso(
+      [
+        { afiliado_id: 'harold', fecha_cobertura: '2025-01-01' },
+        { afiliado_id: 'desconocido', fecha_cobertura: '2020-01-01' },
+      ],
+      ingresos,
+    );
+    expect(anteriores).toHaveLength(1);
+    expect(anteriores[0]!.fecha_ingreso).toBe('2025-10-26');
   });
 });
 

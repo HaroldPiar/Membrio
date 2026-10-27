@@ -49,9 +49,13 @@ export function etiquetaMesLarga(clave: string): string {
   return formateadorLargo.format(fechaDeClave(clave));
 }
 
-/** '2026-09' → 'sept' (chip compacto de meses adeudados, sin el punto). */
+/**
+ * '2026-09' → 'sept 2026' (chip compacto de meses adeudados). El año SIEMPRE
+ * se muestra: la cartera mezcla nov/dic de un año con feb…oct del siguiente
+ * y sin el año el operador no distingue de qué ejercicio habla.
+ */
 export function etiquetaMesChip(clave: string): string {
-  return etiquetaMes(clave).replace(/\.$/, '');
+  return `${etiquetaMes(clave).replace(/\.$/, '')} ${clave.slice(0, 4)}`;
 }
 
 export type PuntoRecaudo = {
