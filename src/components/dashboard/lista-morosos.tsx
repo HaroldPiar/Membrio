@@ -3,6 +3,10 @@
  * centavos exactos, meses adeudados como chips y enlace a Afiliados ya filtrado
  * por «En mora» (`/afiliados?estado=en_mora` — el filtro lo consume la Fase 3).
  *
+ * Cada chip y el `+n` llevan a la pestaña Cartera de `/pagos`
+ * (`?tab=cartera`, QASpec Unidad 4 / decisión 55): el mes que se ve es
+ * exactamente el que la cartera lista como adeudado.
+ *
  * El importe se formatea desde el string del wire; los montos jamás se suman
  * ni restan acá.
  */
@@ -18,6 +22,15 @@ import { formatearDinero } from '../../lib/formato';
 import { ErrorConsulta } from '../ui/error-consulta';
 
 const LIMITE = 5;
+
+/**
+ * Chip navegable: ya no es un `<span>`: es un enlace a la pestaña Cartera de
+ * `/pagos` (?tab=cartera, QASpec Unidad 4). Ahora con el peso y las unidades
+ * numéricas que el contenido de datos ya usa (`text-sm font-semibold
+ * tabular-nums`) y sin encogerse (`shrink-0`) en el flex `justify-between`.
+ */
+const CHIP_CLASES =
+  'shrink-0 rounded bg-por-vencer-bg px-1.5 py-0.5 text-sm font-semibold text-por-vencer-fg tabular-nums hover:underline';
 
 const formateadorFecha = new Intl.DateTimeFormat('es-CO', {
   dateStyle: 'medium',
@@ -81,17 +94,23 @@ export function ListaMorosos({
                   <p className="truncate text-sm font-medium">{deudor.nombre}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {deudor.meses_adeudados.slice(0, 3).map((mes) => (
-                      <span
+                      <a
                         key={mes}
-                        className="rounded bg-por-vencer-bg px-1.5 py-0.5 text-[11px] font-medium text-por-vencer-fg"
+                        href="/pagos?tab=cartera"
+                        aria-label={`Ver ${etiquetaMesChip(mes)} en la cartera de Pagos`}
+                        className={CHIP_CLASES}
                       >
                         {etiquetaMesChip(mes)}
-                      </span>
+                      </a>
                     ))}
                     {excedentes > 0 && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                      <a
+                        href="/pagos?tab=cartera"
+                        aria-label={`Ver los ${excedentes} meses restantes en la cartera de Pagos`}
+                        className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-sm font-semibold text-muted-foreground tabular-nums hover:underline"
+                      >
                         +{excedentes}
-                      </span>
+                      </a>
                     )}
                   </div>
                 </div>

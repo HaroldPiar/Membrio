@@ -13,9 +13,11 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FILTROS_INICIALES,
   alternarOrden,
+  catalogoFormulario,
   conFiltro,
   filtrosAUrl,
   parametrosListado,
+  sinFiltros,
   type Afiliado,
   type EstadoPagoAfiliado,
   type FiltrosAfiliados,
@@ -125,15 +127,18 @@ function ContenidoAfiliados({
     if (seleccion && lista.data && !seleccionado) setSeleccion(null);
   }, [seleccion, lista.data, seleccionado]);
 
-  // Sin scroll de fondo mientras el panel está abierto.
+  // Sin scroll de fondo SOLO mientras el panel de detalle está visible. Al
+  // pasar a la vista de formulario el panel desaparece: el bloqueo se levanta
+  // ahí (QASpec Unidad 2) o el formulario quedaría sin scroll.
+  const panelVisible = vista.tipo === 'lista' && seleccionado !== null;
   useEffect(() => {
-    if (!seleccionado) return;
+    if (!panelVisible) return;
     const anterior = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = anterior;
     };
-  }, [seleccionado]);
+  }, [panelVisible]);
 
   const catalogosListos = !planes.isPending && !categorias.isPending && !eps.isPending;
   const esAdmin = sesion.data?.rol === 'admin';
@@ -144,6 +149,12 @@ function ContenidoAfiliados({
     filtros.plan !== '' ||
     filtros.estado_pago !== null;
 
+  /** Quitar todos los filtros: limpia la búsqueda, los desplegables y la página. */
+  const quitarFiltros = () => {
+    setTexto('');
+    cambiarFiltros((previo) => sinFiltros(previo));
+  };
+
   if (vista.tipo === 'formulario') {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
@@ -153,8 +164,18 @@ function ContenidoAfiliados({
         {catalogosListos ? (
           <FormularioAfiliado
             afiliado={vista.afiliado}
-            planes={planes.data?.datos ?? []}
-            categorias={categorias.data?.datos ?? []}
+            // Solo planes/categorías ACTIVAS; en edición se conserva el actual
+            // aunque esté desactivado (QASpec Unidad 6) y el formulario lo marca.
+            planes={catalogoFormulario(
+              planes.data?.datos ?? [],
+              (plan) => plan.activo,
+              vista.afiliado?.plan_id,
+            )}
+            categorias={catalogoFormulario(
+              categorias.data?.datos ?? [],
+              (categoria) => categoria.activa,
+              vista.afiliado?.categoria_id,
+            )}
             eps={eps.data ?? []}
             onCancelar={() => setVista({ tipo: 'lista' })}
             onListo={(guardado) => {
@@ -210,15 +231,11 @@ function ContenidoAfiliados({
         <ErrorConsulta error={lista.error} reintento={() => void lista.refetch()} />
       ) : lista.isPending ? (
         <EsqueletoListado />
-      ) : lista.data.datos.length === 0 ? (
-        <EstadoVacio
-          mensaje={
-            hayFiltros
-              ? 'Nadie coincide con los filtros actuales. Quita alguno para ver más afiliados.'
-              : 'Aún no hay afiliados registrados. Crea el primero con «Nuevo afiliado».'
-          }
-        />
+      ) : lista.data.datos.length === 0 && !hayFiltros ? (
+        <EstadoVacio mensaje="Aún no hay afiliados registrados. Crea el primero con «Nuevo afiliado»." />
       ) : (
+        // La tabla SIEMPRE conserva sus encabezados (QASpec Unidad 3): sin
+        // filas los filtros siguen a mano y no hay que salir del submenu.
         <TablaAfiliados
           filas={lista.data.datos}
           filtros={filtros}
@@ -227,6 +244,20 @@ function ContenidoAfiliados({
           onSeleccionar={setSeleccion}
           planes={planes.data?.datos ?? []}
           categorias={categorias.data?.datos ?? []}
+          vacio={
+            <div className="flex flex-col items-center gap-3">
+              <p className="max-w-md text-sm text-muted-foreground">
+                {hayFiltros
+                  ? 'Nadie coincide con los filtros actuales. Quita alguno en los encabezados o usa el botón.'
+                  : 'Aún no hay afiliados registrados. Crea el primero con «Nuevo afiliado».'}
+              </p>
+              {hayFiltros && (
+                <Boton variante="borde" tamano="chico" onClick={quitarFiltros}>
+                  Quitar todos los filtros
+                </Boton>
+              )}
+            </div>
+          }
         />
       )}
 

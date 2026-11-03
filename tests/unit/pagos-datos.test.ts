@@ -26,6 +26,7 @@ import {
   mesesCobrablesDe,
   nuevaSeleccion,
   parametrosPagos,
+  pestanaDeUrl,
   sugerenciasDe,
   totalLineas,
   validarComprobante,
@@ -65,6 +66,7 @@ function afiliado(descuento = '0'): Afiliado {
     created_at: '2026-01-15T10:00:00.000Z',
     updated_at: '2026-01-15T10:00:00.000Z',
     estado_pago: 'al_dia',
+    meses_adeudados: [],
   };
 }
 
@@ -154,6 +156,22 @@ describe('conFiltroPagos (controles → estado)', () => {
     // No pisa los demás filtros.
     const conEstado = { ...FILTROS_INICIALES_PAGOS, estado: 'pendiente' as const };
     expect(conFiltroPagos(conEstado, 'hasta', '2026-03-01').estado).toBe('pendiente');
+  });
+});
+
+// QASpec Unidad 4: el enlace del Dashboard /pagos?tab=cartera.
+describe('pestanaDeUrl (query tab → pestaña inicial)', () => {
+  it('reconoce solo cartera; el resto no cambia de pestaña', () => {
+    expect(pestanaDeUrl(new URLSearchParams('tab=cartera'))).toBe('cartera');
+    expect(pestanaDeUrl(new URLSearchParams('tab=historial'))).toBeNull();
+    expect(pestanaDeUrl(new URLSearchParams('tab=verificar'))).toBeNull();
+    expect(pestanaDeUrl(new URLSearchParams('tab='))).toBeNull();
+    expect(pestanaDeUrl(new URLSearchParams('otro=1'))).toBeNull();
+    expect(pestanaDeUrl(new URLSearchParams())).toBeNull();
+  });
+
+  it('ignora los demás params (no pisa filtros ni el resto de la URL)', () => {
+    expect(pestanaDeUrl(new URLSearchParams('q=x&tab=cartera'))).toBe('cartera');
   });
 });
 

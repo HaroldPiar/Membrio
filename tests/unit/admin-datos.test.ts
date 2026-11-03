@@ -12,6 +12,7 @@ import {
   esquemaCategoria,
   esquemaPlan,
   esquemaUsuario,
+  ordenaPlanes,
   planValores,
   planVacio,
   usuarioVacio,
@@ -127,6 +128,26 @@ describe('esquemaPlan', () => {
       valor_mensualidad: '74000.00',
       valor_matricula: '80000.00',
     });
+  });
+});
+
+describe('ordenaPlanes', () => {
+  it('pone primero los activos y después los inactivos, sin mutar el recibido', () => {
+    const planes = [
+      { id: 'p1', activo: false },
+      { id: 'p2', activo: true },
+      { id: 'p3', activo: true },
+      { id: 'p4', activo: false },
+    ];
+    expect(ordenaPlanes(planes).map((p) => p.id)).toEqual(['p2', 'p3', 'p1', 'p4']);
+    expect(planes.map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4']);
+  });
+
+  it('con todos activos devuelve el mismo orden', () => {
+    expect(ordenaPlanes([{ id: 'a', activo: true }, { id: 'b', activo: true }]).map((p) => p.id)).toEqual([
+      'a',
+      'b',
+    ]);
   });
 });
 

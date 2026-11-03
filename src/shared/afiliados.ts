@@ -62,6 +62,12 @@ export const afiliadoSchema = z
     estado_pago: estadoPagoSchema.nullable().openapi({
       description: 'Solo en detalle y listado: calculado, null si el afiliado está retirado',
     }),
+    meses_adeudados: z.array(z.string().openapi({ example: '2026-03' })).openapi({
+      description:
+        'Meses exigibles sin pago verificado (' +
+        "'AAAA-MM'" +
+        '); calculado con el mismo estado que estado_pago; vacío si está al día o retirado',
+    }),
   })
   .openapi('Afiliado');
 
@@ -109,9 +115,19 @@ export const afiliadoFiltrosSchema = paginacionQuerySchema.extend({
     description: 'Búsqueda por nombre o número de documento (parcial, case-insensitive)',
     example: 'ramirez',
   }),
-  activo: z.coerce.boolean().optional().openapi({
-    description: 'true/false; sin este parámetro se devuelven ambos',
-  }),
+  // z.coerce.boolean() aplica Boolean(v) al string de la query y Boolean('false')
+  // === true: «Retirados» habría pedido activos. El string se traduce aquí y lo
+  // que no sea 'true'/'false' cae en z.boolean() → 400 (nunca devuelve todo).
+  activo: z
+    .preprocess(
+      (valor) =>
+        typeof valor === 'string' ? (valor === 'true' ? true : valor === 'false' ? false : valor) : valor,
+      z.boolean().optional(),
+    )
+    .openapi({
+      description: 'true/false; sin este parámetro se devuelven ambos',
+      example: false,
+    }),
   categoria: idSchema.optional(),
   plan: idSchema.optional(),
   estado_pago: estadoPagoSchema.optional().openapi({

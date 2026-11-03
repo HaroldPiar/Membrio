@@ -1290,7 +1290,7 @@ export interface paths {
                     /** @description Búsqueda por nombre o número de documento (parcial, case-insensitive) */
                     q?: string;
                     /** @description true/false; sin este parámetro se devuelven ambos */
-                    activo?: boolean | null;
+                    activo?: boolean;
                     categoria?: string;
                     plan?: string;
                     /** @description Requiere calcular el estado de cada afiliado; solo afiliados activos */
@@ -1583,6 +1583,77 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/afiliados/{id}/pagos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Historial de pagos de un afiliado (con sus líneas y meses)
+         * @description Devuelve los últimos pagos que incluyen a este nadador, con SUS líneas (fecha_cobertura = mes cubierto) y su porción del monto. Los rechazados quedan fuera: sus líneas se liberaron (§8.1.5).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Cuántos pagos del afiliado devolver (máx 50, por defecto 10) */
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Pagos del afiliado con sus líneas */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HistorialPagos"];
+                    };
+                };
+                /** @description Validación: datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sesión ausente, inválida o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Recurso inexistente (incluye recursos de otra organización) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/afiliados/{id}/retiro": {
@@ -2771,6 +2842,8 @@ export interface components {
              * @enum {string|null}
              */
             estado_pago: "al_dia" | "por_vencer" | "en_mora" | null;
+            /** @description Meses exigibles sin pago verificado ('AAAA-MM'); calculado con el mismo estado que estado_pago; vacío si está al día o retirado */
+            meses_adeudados: string[];
         };
         AfiliadoCreacion: {
             /**
@@ -2819,6 +2892,51 @@ export interface components {
              * @example 2026-02-01
              */
             fecha_consentimiento?: string | null;
+        };
+        HistorialPagos: {
+            datos: components["schemas"]["PagoHistorial"][];
+        };
+        PagoHistorial: {
+            /**
+             * Format: uuid
+             * @example 0b6f8f5e-8f4e-4a2b-9d3a-1c2b3d4e5f60
+             */
+            id: string;
+            /**
+             * @example pendiente
+             * @enum {string}
+             */
+            estado: "pendiente" | "verificado" | "rechazado";
+            /**
+             * @description Suma de las líneas de ESTE afiliado en el pago (centavos exactos)
+             * @example 150000.00
+             */
+            monto: string;
+            /**
+             * Format: date-time
+             * @description Fecha y hora en que se registró el pago
+             * @example 2026-02-15T10:30:00.000Z
+             */
+            created_at: string;
+            lineas: components["schemas"]["LineaHistorial"][];
+        };
+        LineaHistorial: {
+            /**
+             * @description matricula implica fecha_cobertura = 1 de enero del año (§8.2)
+             * @example mensualidad
+             * @enum {string}
+             */
+            concepto: "mensualidad" | "matricula";
+            /**
+             * Format: date
+             * @example 2026-02-01
+             */
+            fecha_cobertura: string;
+            /**
+             * @description Monto como cadena decimal (nunca número flotante)
+             * @example 150000.00
+             */
+            monto: string;
         };
         Retiro: {
             /**

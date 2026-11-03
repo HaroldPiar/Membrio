@@ -104,13 +104,15 @@ export function TabCartera() {
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums">
                     {formatearDinero(deudor.valor_adeudado)}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="shrink-0 px-3 py-2.5 text-right">
+                    {/* whitespace-nowrap + shrink-0 (QASpec Unidad 5): la celda
+                        angosta partía «Registrar / pago» en dos líneas. */}
                     <a
                       href={`/pagos/nuevo?afiliado=${deudor.afiliado_id}`}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-surface px-2.5 text-xs font-medium transition-colors hover:bg-muted"
+                      className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-surface px-2.5 text-xs font-medium transition-colors hover:bg-muted"
                     >
                       Registrar pago
-                      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     </a>
                   </td>
                 </tr>

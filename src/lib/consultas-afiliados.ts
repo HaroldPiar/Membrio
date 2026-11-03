@@ -13,7 +13,7 @@ import type { Acudiente, Afiliado, parametrosListado } from './afiliados-datos';
 import type { z } from '@hono/zod-openapi';
 
 import { categoriaSchema, epsSchema, planSchema } from '../shared/catalogos';
-import { pagoResumenSchema } from '../shared/pagos';
+import { historialPagosSchema } from '../shared/pagos';
 
 export type AfiliadosPaginados = {
   datos: Afiliado[];
@@ -22,7 +22,7 @@ export type AfiliadosPaginados = {
 export type Plan = z.infer<typeof planSchema>;
 export type Categoria = z.infer<typeof categoriaSchema>;
 export type Eps = z.infer<typeof epsSchema>;
-export type PagoResumen = z.infer<typeof pagoResumenSchema>;
+export type HistorialPagos = z.infer<typeof historialPagosSchema>;
 
 type ParametrosListado = ReturnType<typeof parametrosListado>;
 
@@ -96,14 +96,19 @@ export function useEps(): UseQueryResult<Eps[], Error> {
   });
 }
 
-/** Historial de pagos del afiliado (panel de detalle): últimos 10. */
-export function useHistorialPagos(afiliadoId: string | null): UseQueryResult<{ datos: PagoResumen[] }, Error> {
-  return useQuery<{ datos: PagoResumen[] }, Error>({
+/**
+ * Historial de pagos del afiliado (panel de detalle, QASpec Unidad 2): sus
+ * líneas con el mes cubierto y su porción del monto. Últimos 10 por defecto.
+ */
+export function useHistorialPagos(
+  afiliadoId: string | null,
+): UseQueryResult<HistorialPagos, Error> {
+  return useQuery<HistorialPagos, Error>({
     queryKey: ['afiliados', 'historial', afiliadoId],
     queryFn: () =>
       procesar(
-        api.GET('/api/v1/pagos', {
-          params: { query: { afiliado: afiliadoId ?? '', limit: 10 } },
+        api.GET('/api/v1/afiliados/{id}/pagos', {
+          params: { path: { id: afiliadoId ?? '' }, query: { limit: 10 } },
         }),
       ),
     enabled: afiliadoId !== null,

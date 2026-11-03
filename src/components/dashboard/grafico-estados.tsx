@@ -3,16 +3,24 @@
  * mora. Los sectores usan los tokens de estado (§2.2) vía `style` (CSS real,
  * las variables resuelven) y la leyenda lleva color + texto + cantidad, nunca
  * solo color (accesibilidad, §2.2).
+ *
+ * Interacción (QASpec Unidad 4 / decisión 56): hover levanta y aclara el
+ * sector activo (también la tarjeta recibe un anillo de foco) y el clic —en el
+ * sector o en la fila de la leyenda, para que también se llegue con teclado—
+ * abre `/afiliados?estado=…` con ese filtro.
  */
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 
 import {
   porcentajes,
   porcionesEstados,
+  rutaAfiliadosPorEstado,
   type EstadoAfiliado,
   type ResumenDashboard,
 } from '../../lib/dashboard-datos';
+import { cn } from '../../lib/cn';
 import { ErrorConsulta } from '../ui/error-consulta';
 
 const COLORES: Record<EstadoAfiliado, string> = {
@@ -32,6 +40,8 @@ export function GraficoEstados({
 }: {
   resumen: UseQueryResult<ResumenDashboard, Error>;
 }) {
+  const [activo, setActivo] = useState<EstadoAfiliado | null>(null);
+
   if (resumen.isError) {
     return <ErrorConsulta error={resumen.error} reintento={() => void resumen.refetch()} />;
   }
@@ -42,9 +52,21 @@ export function GraficoEstados({
   const porciones = porcionesEstados(resumen.data.afiliados);
   const conPorcentaje = porcentajes(porciones);
   const activos = resumen.data.afiliados.activos;
+  // Detalle vivo del estado bajo el cursor/hover (QASpec checklist cierre 2 nov):
+  // "Al día: 3 afiliados (25%)". nulo fuera de hover.
+  const detalle = activo !== null ? conPorcentaje.find((p) => p.estado === activo) ?? null : null;
+
+  const irA = (estado: EstadoAfiliado) => {
+    window.location.assign(rutaAfiliadosPorEstado(estado));
+  };
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+    <div
+      className={cn(
+        'rounded-lg border border-border bg-surface p-4 shadow-sm transition-shadow',
+        activo !== null && 'ring-1 ring-primary/40 shadow-md',
+      )}
+    >
       <div className="mb-3">
         <h2 className="text-sm font-semibold">Estado de pago</h2>
         <p className="text-xs text-muted-foreground">Afiliados activos</p>
@@ -68,13 +90,31 @@ export function GraficoEstados({
                   paddingAngle={2}
                   stroke="none"
                   isAnimationActive={false}
+                  cursor="pointer"
                 >
-                  {porciones.map((porcion) => (
-                    <Cell
-                      key={porcion.estado}
-                      style={{ fill: COLORES[porcion.estado] }}
-                    />
-                  ))}
+                  {porciones.map((porcion) => {
+                    const enHover = activo === porcion.estado;
+                    return (
+                      <Cell
+                        key={porcion.estado}
+                        onMouseEnter={() => setActivo(porcion.estado)}
+                        onMouseLeave={() => setActivo(null)}
+                        onClick={() => irA(porcion.estado)}
+                        style={{
+                          fill: COLORES[porcion.estado],
+                          // `var()` no resuelve en atributos SVG: siempre `style` (§2.2).
+                          filter: enHover ? 'brightness(1.08)' : undefined,
+                          // "Un poco más de área": escala el sector desde su
+                          // propio centro, sin mover la posición (un lift hacía
+                          // que el sector "pegara" contra la sección superior).
+                          transform: enHover ? 'scale(1.05)' : undefined,
+                          transformBox: enHover ? 'fill-box' : undefined,
+                          transformOrigin: enHover ? 'center' : undefined,
+                          transition: 'transform 150ms ease, filter 150ms ease',
+                        }}
+                      />
+                    );
+                  })}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
@@ -84,18 +124,33 @@ export function GraficoEstados({
             </div>
           </div>
 
+          {detalle ? (
+            <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+              {ETIQUETAS[detalle.estado]}: {detalle.cantidad} afiliados activos ({detalle.porcentaje}%).
+            </p>
+          ) : null}
+
           <ul className="mt-3 space-y-1.5">
             {conPorcentaje.map(({ estado, cantidad, porcentaje }) => (
-              <li key={estado} className="flex items-center gap-2 text-sm">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: COLORES[estado] }}
-                  aria-hidden="true"
-                />
-                <span className="flex-1">{ETIQUETAS[estado]}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {cantidad} · {porcentaje}%
-                </span>
+              <li key={estado}>
+                <a
+                  href={rutaAfiliadosPorEstado(estado)}
+                  onMouseEnter={() => setActivo(estado)}
+                  onMouseLeave={() => setActivo(null)}
+                  onFocus={() => setActivo(estado)}
+                  onBlur={() => setActivo(null)}
+                  className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-muted focus-visible:outline focus-visible:outline-1 focus-visible:outline-primary"
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: COLORES[estado] }}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1">{ETIQUETAS[estado]}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {cantidad} · {porcentaje}%
+                  </span>
+                </a>
               </li>
             ))}
           </ul>

@@ -11,6 +11,7 @@ import {
   etiquetaMesLarga,
   porcionesEstados,
   porcentajes,
+  rutaAfiliadosPorEstado,
   serieRecaudo,
   topMorosos,
   type Deudor,
@@ -24,6 +25,15 @@ describe('etiquetas de mes (es-CO)', () => {
     expect(etiquetaMesChip('2025-11')).toBe('nov 2025');
     // Cruce de año: la clave manda, no el año actual.
     expect(etiquetaMesLarga('2025-11')).toBe('noviembre de 2025');
+  });
+});
+
+// QASpec Unidad 4: la dona navega al listado filtrado.
+describe('rutaAfiliadosPorEstado', () => {
+  it('produce el query que lee filtrosDeUrl', () => {
+    expect(rutaAfiliadosPorEstado('al_dia')).toBe('/afiliados?estado=al_dia');
+    expect(rutaAfiliadosPorEstado('por_vencer')).toBe('/afiliados?estado=por_vencer');
+    expect(rutaAfiliadosPorEstado('en_mora')).toBe('/afiliados?estado=en_mora');
   });
 });
 

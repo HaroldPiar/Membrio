@@ -97,6 +97,15 @@ export function porcionesEstados(afiliados: ResumenDashboard['afiliados']): Porc
 export type PorcionConPorcentaje = PorcionEstado & { porcentaje: number };
 
 /**
+ * Ruta del listado de Afiliados filtrado por un estado de pago
+ * (QASpec Unidad 4 / decisión 55). Los valores son los mismos que lee
+ * `filtrosDeUrl` de afiliados-datos — `?estado=al_dia|por_vencer|en_mora`.
+ */
+export function rutaAfiliadosPorEstado(estado: EstadoAfiliado): string {
+  return `/afiliados?estado=${estado}`;
+}
+
+/**
  * Porcentajes para la leyenda de la dona. Son CONTEOS (no dinero): `number`
  * está permitido. Redondeo a entero — la leyenda es informativa, no un monto.
  */

@@ -3,7 +3,8 @@
  *  - POST /pagos rechaza coberturas ANTERIORES al mes de ingreso → 400;
  *  - POST /pagos rechaza mensualidades de enero → 400 (enero = matrícula);
  *  - GET /pagos filtra por factura (texto parcial) y por revisado_desde/hasta;
- *  - GET /afiliados ordena por documento/nombre asc/desc con cursor estable.
+ *  - GET /afiliados ordena por documento/nombre asc/desc con cursor estable;
+ *  - GET /afiliados filtra `activo=false` SOLO retirados (QASpec Unidad 1).
  *
  * Requiere la base local levantada y con seed (`pnpm test:integracion`).
  * Usa Drizzle directo solo para armar/borrar fixtures — la API se ejercita
@@ -270,5 +271,40 @@ describe('GET /afiliados — orden por columna con cursor', () => {
     for (let i = 1; i < datos.datos.length; i += 1) {
       expect(datos.datos[i - 1]!.numero_documento >= datos.datos[i]!.numero_documento).toBe(true);
     }
+  });
+});
+
+describe('GET /afiliados — filtro activo (QASpec Unidad 1)', () => {
+  /** La seed tiene al menos un retirado y un activo; si no, el test avisa. */
+  async function pagina(query: string): Promise<{ activo: boolean }[]> {
+    const r = await pedir('GET', `/api/v1/afiliados?limit=100&${query}`);
+    expect(r.status).toBe(200);
+    const datos = (await r.json()) as { datos: { activo: boolean }[] };
+    return datos.datos;
+  }
+
+  it('activo=false devuelve SOLO retirados (regresión del bug de coerce)', async () => {
+    const filas = await pagina('activo=false');
+    expect(filas.length).toBeGreaterThan(0);
+    for (const fila of filas) expect(fila.activo).toBe(false);
+  });
+
+  it('activo=true devuelve SOLO activos', async () => {
+    const filas = await pagina('activo=true');
+    expect(filas.length).toBeGreaterThan(0);
+    for (const fila of filas) expect(fila.activo).toBe(true);
+  });
+
+  it('sin el parámetro devuelve ambos (hay activos y retirados en la seed)', async () => {
+    const filas = await pagina('');
+    const activos = filas.filter((f) => f.activo).length;
+    const retirados = filas.filter((f) => !f.activo).length;
+    expect(activos).toBeGreaterThan(0);
+    expect(retirados).toBeGreaterThan(0);
+  });
+
+  it('activo con valor no reconocido → 400 (no "devolver todo")', async () => {
+    const r = await pedir('GET', '/api/v1/afiliados?activo=bogus');
+    expect(r.status).toBe(400);
   });
 });

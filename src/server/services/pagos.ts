@@ -16,11 +16,61 @@ import type { ContextoTenant } from '../middleware/auth';
 import * as reposAfiliados from '../repositories/afiliados';
 import * as reposPagos from '../repositories/pagos';
 import { lineasAnterioresAlIngreso } from '../../shared/pagos';
+import { centavosACadena, centavosDesdeCadena } from '../../shared/dinero';
 
 export type PagoConLineas = Awaited<ReturnType<typeof obtenerPago>>;
 
 export function listarPagos(ctx: ContextoTenant, filtros: reposPagos.FiltrosPagos) {
   return reposPagos.listarPagos(ctx, filtros);
+}
+
+/**
+ * Historial de UN afiliado (QASpec Unidad 2): sus pagos con SUS líneas y su
+ * porción del monto — un pago puede cubrir varios nadadores (una familia) y
+ * `monto_total` sería el total de todos, no lo que pagó este afiliado.
+ *
+ * Los rechazados quedan fuera: al rechazar se borran sus líneas (§8.1.5) y ya
+ * no dicen qué mes ocupaban. La suma de `monto` se hace en CENTAVOS exactos.
+ */
+export async function historialAfiliado(ctx: ContextoTenant, afiliadoId: string, limit: number) {
+  // Afiliado ajeno o inexistente → 404 uniforme (spec §5.4), nunca lista vacía.
+  if (!(await reposAfiliados.obtenerAfiliado(ctx, afiliadoId))) {
+    throw noEncontrado('Afiliado');
+  }
+  const pagos = await reposPagos.listarPagos(ctx, {
+    afiliado: afiliadoId,
+    sinRechazados: true,
+    limit,
+  });
+  if (pagos.length === 0) return [];
+
+  const lineas = await reposPagos.lineasDeAfiliado(
+    ctx,
+    pagos.map((p) => p.id),
+    afiliadoId,
+  );
+  const porPago = new Map<string, typeof lineas>();
+  for (const linea of lineas) {
+    const actuales = porPago.get(linea.pagoId) ?? [];
+    actuales.push(linea);
+    porPago.set(linea.pagoId, actuales);
+  }
+
+  return pagos.map((pago) => {
+    const mias = porPago.get(pago.id) ?? [];
+    const centavos = mias.reduce((total, linea) => total + centavosDesdeCadena(linea.monto), 0);
+    return {
+      id: pago.id,
+      estado: pago.estado,
+      monto: centavosACadena(centavos),
+      created_at: pago.createdAt,
+      lineas: mias.map((linea) => ({
+        concepto: linea.concepto,
+        fecha_cobertura: linea.fechaCobertura,
+        monto: linea.monto,
+      })),
+    };
+  });
 }
 
 export async function obtenerPago(ctx: ContextoTenant, id: string) {

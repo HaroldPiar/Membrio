@@ -237,7 +237,10 @@ export function FormularioAfiliado({
                 <option value="">— Selecciona un plan —</option>
                 {planes.map((plan) => (
                   <option key={plan.id} value={plan.id}>
+                    {/* Solo puede llegar desactivado el plan ACTUAL en edición
+                        (catalogoFormulario); se marca para no elegirlo a ciegas. */}
                     {plan.nombre}
+                    {plan.activo ? '' : ' (desactivado)'}
                   </option>
                 ))}
               </CampoSeleccion>
@@ -252,6 +255,7 @@ export function FormularioAfiliado({
                 {categorias.map((categoria) => (
                   <option key={categoria.id} value={categoria.id}>
                     {categoria.nombre}
+                    {categoria.activa ? '' : ' (desactivado)'}
                   </option>
                 ))}
               </CampoSeleccion>

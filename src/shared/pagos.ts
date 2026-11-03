@@ -62,6 +62,51 @@ export const pagoSchema = z
 /** Resumen para listados (sin líneas). */
 export const pagoResumenSchema = pagoSchema.omit({ lineas: true }).openapi('PagoResumen');
 
+/**
+ * Línea del historial de UN afiliado (QASpec Unidad 2): se muestra el mes que
+ * cubre (fecha_cobertura, siempre día 1) junto a su monto, sin el resto de
+ * nadadores que pudo incluir el mismo pago familiar.
+ */
+const lineaHistorialSchema = z
+  .object({
+    concepto: conceptoSchema,
+    fecha_cobertura: fecha,
+    monto: dineroSchema,
+  })
+  .openapi('LineaHistorial');
+
+/**
+ * Pago del historial de un afiliado: SOLO sus líneas y su porción del monto.
+ * `monto_total` no sirve acá: un pago puede cubrir varios nadadores (una
+ * familia) y sería el total de todos, no lo que pagó este afiliado.
+ *
+ * Los pagos RECHAZADOS quedan fuera: sus líneas se liberaron (§8.1.5) y ya no
+ * dicen qué mes ocupaban (QASpec Unidad 2, decisión 54).
+ */
+export const pagoHistorialSchema = z
+  .object({
+    id: idSchema,
+    estado: estadoPagoSchema,
+    monto: dineroSchema.openapi({
+      description: 'Suma de las líneas de ESTE afiliado en el pago (centavos exactos)',
+    }),
+    created_at: instante.openapi({ description: 'Fecha y hora en que se registró el pago' }),
+    lineas: z.array(lineaHistorialSchema),
+  })
+  .openapi('PagoHistorial');
+
+export const historialPagosSchema = z
+  .object({ datos: z.array(pagoHistorialSchema) })
+  .openapi('HistorialPagos');
+
+/** Query del historial: solo límite (sin cursor: el panel muestra los últimos N). */
+export const historialPagosQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10).openapi({
+    example: 10,
+    description: 'Cuántos pagos del afiliado devolver (máx 50, por defecto 10)',
+  }),
+});
+
 const lineaCreacionSchema = z.object({
   afiliado_id: idSchema,
   concepto: conceptoSchema,

@@ -80,6 +80,20 @@ export const FILTROS_INICIALES_PAGOS: FiltrosPagos = {
 /** Bandeja de trabajo: la pestaña Por verificar es el filtro estado=pendiente. */
 export const FILTROS_PENDIENTES: FiltrosPagos = { ...FILTROS_INICIALES_PAGOS, estado: 'pendiente' };
 
+export type Pestana = 'verificar' | 'historial' | 'cartera';
+
+/**
+ * Pestaña inicial leída de la URL (`/pagos?tab=cartera` — QASpec Unidad 4 /
+ * decisión 55, el destino de los chips de «Los más morosos»).
+ *
+ * Solo `cartera` es reconocido: cualquier otro valor devuelve `null` y la isla
+ * queda en «Por verificar». Es el ÚNICO query param que controla UI; los
+ * filtros del Historial siguen fuera de la URL (decisión 31).
+ */
+export function pestanaDeUrl(params: URLSearchParams): Pestana | null {
+  return params.get('tab') === 'cartera' ? 'cartera' : null;
+}
+
 export const LIMITE_PAGOS = 20;
 
 export type CamposFiltroPagos =

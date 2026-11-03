@@ -5,8 +5,11 @@
  * Cartera — con paginación por cursor y panel de detalle. Una sola isla para
  * que las consultas compartan el mismo QueryClient.
  *
- * A diferencia de /afiliados, los filtros NO se reflejan en la URL: el
- * contrato de fase no lo pide y la pestaña activa tampoco — decisión 31.
+ * Los filtros NO se reflejan en la URL (decisión 31), pero la pestaña inicial
+ * SÍ: `/pagos?tab=cartera` la abre al montar (QASpec Unidad 4 / decisión 55),
+ * que es el destino de los chips de «Los más morosos» del Dashboard. Se lee en
+ * un efecto (no en el useState) porque la isla se renderiza en el servidor y
+ * `window` no existe ahí.
  */
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -20,7 +23,9 @@ import {
   conFiltroPagos,
   hayFiltrosPagos,
   parametrosPagos,
+  pestanaDeUrl,
   type FiltrosPagos,
+  type Pestana,
 } from '../../lib/pagos-datos';
 import { Boton } from '../ui/boton';
 import { EstadoVacio } from '../ui/estado-vacio';
@@ -29,8 +34,6 @@ import { ProveedorConsultas } from '../ui/proveedor-consultas';
 import { PanelPago } from './panel-pago';
 import { TabCartera } from './tab-cartera';
 import { TablaPagos } from './tabla-pagos';
-
-type Pestana = 'verificar' | 'historial' | 'cartera';
 
 const PESTANAS: { valor: Pestana; etiqueta: string }[] = [
   { valor: 'verificar', etiqueta: 'Por verificar' },
@@ -62,6 +65,13 @@ function ContenidoPagos() {
   const [pila, setPila] = useState<string[]>([]);
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const resumen = useResumen();
+
+  // /pagos?tab=cartera → abrir Cartera (decisión 55). Efecto de montaje: la
+  // isla se renderiza en el servidor y ahí no existe `window`.
+  useEffect(() => {
+    const pestanaInicial = pestanaDeUrl(new URLSearchParams(window.location.search));
+    if (pestanaInicial) setPestana(pestanaInicial);
+  }, []);
 
   /** Cambiar de pestaña o de filtros SIEMPRE vuelve a la primera página. */
   const reiniciar = () => setPila((anterior) => (anterior.length > 0 ? [] : anterior));

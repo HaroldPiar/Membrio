@@ -11,12 +11,14 @@ import {
   acudienteConContenido,
   acudienteParaEnviar,
   alternarOrden,
+  catalogoFormulario,
   conFiltro,
   esquemaFormularioAfiliado,
   filtrosAUrl,
   filtrosDeUrl,
   fraccionAPorcentaje,
   parametrosListado,
+  sinFiltros,
   valoresAlta,
   valoresEdicion,
   type Afiliado,
@@ -120,6 +122,80 @@ describe('conFiltro (encabezado de columna → estado)', () => {
     // No pisa los demás filtros.
     const conQ = { ...FILTROS_INICIALES, q: 'pep' };
     expect(conFiltro(conQ, 'categoria', UUID_CATEGORIA).q).toBe('pep');
+  });
+});
+
+// QASpec Unidad 3: salir de un filtro que no coincide con nada.
+describe('sinFiltros (quitar todos los filtros)', () => {
+  it('limpia q, activo, categoria, plan y estado_pago', () => {
+    const sucios = {
+      ...FILTROS_INICIALES,
+      q: 'camila',
+      activo: false,
+      categoria: UUID_CATEGORIA,
+      plan: UUID_PLAN,
+      estado_pago: 'en_mora' as const,
+    };
+    const limpio = sinFiltros(sucios);
+    expect(limpio).toEqual(FILTROS_INICIALES);
+    expect(limpio.q).toBe('');
+    expect(limpio.activo).toBeNull();
+    expect(limpio.categoria).toBe('');
+    expect(limpio.plan).toBe('');
+    expect(limpio.estado_pago).toBeNull();
+  });
+
+  it('conserva el orden activo (A-Z/Z-A no es un filtro de contenido)', () => {
+    const sucios = { ...FILTROS_INICIALES, q: 'x', orden: 'documento' as const, direccion: 'desc' as const };
+    const limpio = sinFiltros(sucios);
+    expect(limpio.orden).toBe('documento');
+    expect(limpio.direccion).toBe('desc');
+    expect(limpio.q).toBe('');
+  });
+
+  it('no muta el objeto recibido', () => {
+    const original = { ...FILTROS_INICIALES, q: 'x' };
+    sinFiltros(original);
+    expect(original.q).toBe('x');
+  });
+});
+
+// QASpec Unidad 6: el plan/categoría desactivado no se ofrece a nuevos altas.
+describe('catalogoFormulario (solo activos + el actual en edición)', () => {
+  const catalogo = [
+    { id: 'a', nombre: 'Competición', activo: true },
+    { id: 'b', nombre: 'Recreativo', activo: false },
+    { id: 'c', nombre: 'Mañana', activo: true },
+  ];
+  const esActivo = (item: { activo: boolean }) => item.activo;
+
+  it('en ALTA devuelve solo los activos', () => {
+    expect(catalogoFormulario(catalogo, esActivo).map((p) => p.id)).toEqual(['a', 'c']);
+    expect(catalogoFormulario(catalogo, esActivo, null).map((p) => p.id)).toEqual(['a', 'c']);
+  });
+
+  it('en EDICIÓN conserva el actual desactivado aunque no esté en los activos', () => {
+    expect(catalogoFormulario(catalogo, esActivo, 'b').map((p) => p.id)).toEqual(['a', 'c', 'b']);
+    // El actual activo no se duplica.
+    expect(catalogoFormulario(catalogo, esActivo, 'a').map((p) => p.id)).toEqual(['a', 'c']);
+  });
+
+  it('un id que no existe no agrega nada', () => {
+    expect(catalogoFormulario(catalogo, esActivo, 'zzz').map((p) => p.id)).toEqual(['a', 'c']);
+  });
+
+  it('acepta el adjetivo femenino de categorías (activa)', () => {
+    const categorias = [
+      { id: 'x', activa: true },
+      { id: 'y', activa: false },
+    ];
+    expect(catalogoFormulario(categorias, (c) => c.activa).map((c) => c.id)).toEqual(['x']);
+    expect(catalogoFormulario(categorias, (c) => c.activa, 'y').map((c) => c.id)).toEqual(['x', 'y']);
+  });
+
+  it('no muta la lista recibida', () => {
+    catalogoFormulario(catalogo, esActivo, 'b');
+    expect(catalogo).toHaveLength(3);
   });
 });
 
@@ -283,6 +359,7 @@ describe('defaultValues del formulario', () => {
       created_at: '2026-01-15T10:00:00.000Z',
       updated_at: '2026-01-15T10:00:00.000Z',
       estado_pago: 'al_dia',
+      meses_adeudados: [],
     };
     const valores = valoresEdicion(afiliado);
     expect(valores.eps_id).toBeUndefined();

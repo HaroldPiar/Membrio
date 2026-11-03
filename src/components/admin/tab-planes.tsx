@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form';
 
 import {
   esquemaPlan,
+  ordenaPlanes,
   planValores,
   planVacio,
   type DatosPlan,
@@ -173,6 +174,10 @@ export function TabPlanes() {
 
   const abierto = creando || editando !== null;
 
+  // QASpec post-cierre: el listado activa los primero, los inactivos después
+  // (mismo criterio de lectura que el select del formulario).
+  const planesOrdenados = ordenaPlanes(planes.data?.datos ?? []);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -236,7 +241,7 @@ export function TabPlanes() {
               </tr>
             </thead>
             <tbody>
-              {planes.data.datos.map((plan) => {
+              {planesOrdenados.map((plan) => {
                 const enConfirmando = confirmando === plan.id;
                 return (
                   <Fragment key={plan.id}>

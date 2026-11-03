@@ -12,7 +12,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import {
   ETIQUETAS_ESTADO_PAGO,
@@ -25,7 +25,6 @@ import { cn } from '../../lib/cn';
 import type { Categoria, Plan } from '../../lib/consultas-afiliados';
 import { EstadoPago } from '../ui/estado-pago';
 import { FiltroColumna, type OpcionFiltro } from '../ui/filtro-columna';
-
 /** Encabezado ordenable: clic alterna ASC ⇄ DESC (A-Z / Z-A). */
 function EncabezadoOrden({
   etiqueta,
@@ -66,6 +65,7 @@ export function TablaAfiliados({
   onSeleccionar,
   planes,
   categorias,
+  vacio,
 }: {
   filas: Afiliado[];
   filtros: FiltrosAfiliados;
@@ -74,6 +74,13 @@ export function TablaAfiliados({
   onSeleccionar: (id: string) => void;
   planes: Plan[];
   categorias: Categoria[];
+  /**
+   * Contenido del estado vacío. Se renderiza DENTRO de la tabla, en una fila
+   * que cruza todas las columnas (QASpec Unidad 3): así los encabezados —y
+   * con ellos los controles de filtro— siguen accesibles para quitar el
+   * filtro que no coincide con nada.
+   */
+  vacio?: ReactNode;
 }) {
   const nombresPlanes = useMemo(() => new Map(planes.map((plan) => [plan.id, plan.nombre])), [planes]);
   const nombresCategorias = useMemo(
@@ -235,6 +242,13 @@ export function TablaAfiliados({
               ))}
             </tr>
           ))}
+          {filas.length === 0 && vacio && (
+            <tr>
+              <td colSpan={columnas.length} className="px-3 py-8 text-center">
+                {vacio}
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

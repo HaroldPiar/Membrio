@@ -11,7 +11,20 @@ import type { EstadoPagoCalculado, ResultadoEstado } from './estado-pago';
 import { calcularEstadoPago, hoyEnZona } from './estado-pago';
 import type { Opcionales } from '../../shared/casing';
 
-export type AfiliadoConEstado<T> = T & { estado_pago: EstadoPagoCalculado | null };
+export type AfiliadoConEstado<T> = T & {
+  estado_pago: EstadoPagoCalculado | null;
+  /** Meses exigibles sin pago verificado ('AAAA-MM'); vacío si está al día. */
+  meses_adeudados: string[];
+};
+
+/** Adjunta estado y meses adeudados — los dos derivados del mismo cálculo (§8.3). */
+function conResultado<T>(fila: T, estado: ResultadoEstado | null | undefined): AfiliadoConEstado<T> {
+  return {
+    ...fila,
+    estado_pago: estado?.estado ?? null,
+    meses_adeudados: estado?.mesesAdeudados ?? [],
+  };
+}
 
 /**
  * Estado para un lote de afiliados con UNA consulta de meses pagados.
@@ -105,30 +118,27 @@ export async function listarAfiliados(
       ? cumplen.findIndex((f) => esPosteriorAlCursor(f, cursor, filtros.orden, descendente))
       : 0;
     const inicio = desde >= 0 ? desde : cumplen.length;
-    return cumplen.slice(inicio, inicio + filtros.limit).map((f) => ({
-      ...f,
-      estado_pago: estados.get(f.id)?.estado ?? null,
-    }));
+    return cumplen.slice(inicio, inicio + filtros.limit).map((f) => conResultado(f, estados.get(f.id)));
   }
   const filas = await reposAfiliados.listarAfiliados(ctx, filtros);
   const estados = await estadosDe(ctx, filas, hoy);
-  return filas.map((f) => ({ ...f, estado_pago: estados.get(f.id)?.estado ?? null }));
+  return filas.map((f) => conResultado(f, estados.get(f.id)));
 }
 
 export async function obtenerAfiliado(ctx: ContextoTenant, id: string) {
   const afiliado = await reposAfiliados.obtenerAfiliado(ctx, id);
   if (!afiliado) throw noEncontrado('Afiliado');
   const [estado] = (await estadosDe(ctx, [afiliado])).values();
-  return { ...afiliado, estado_pago: estado?.estado ?? null };
+  return conResultado(afiliado, estado);
 }
 
-/** Adjunta estado_pago calculado a una fila (respuestas de detalle). */
+/** Adjunta estado_pago y meses adeudados a una fila (respuestas de detalle). */
 async function conEstado<T extends { id: string; fechaIngreso: string; activo: boolean }>(
   ctx: ContextoTenant,
   fila: T,
-): Promise<T & { estado_pago: EstadoPagoCalculado | null }> {
+): Promise<AfiliadoConEstado<T>> {
   const [estado] = (await estadosDe(ctx, [fila])).values();
-  return { ...fila, estado_pago: estado?.estado ?? null };
+  return conResultado(fila, estado);
 }
 
 export async function crearAfiliado(
@@ -171,5 +181,6 @@ export async function retirarAfiliado(
     motivoRetiro: datos.motivo_retiro ?? null,
   });
   if (!retirado) throw noEncontrado('Afiliado');
-  return { ...retirado, estado_pago: null };
+  // Un retirado no se evalúa (§8.3): estado y deuda quedan vacíos.
+  return { ...retirado, estado_pago: null, meses_adeudados: [] };
 }

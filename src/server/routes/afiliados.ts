@@ -13,6 +13,7 @@ import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import type { EnvAplicacion } from '../middleware/auth';
 import { contextoDe, requerirAuth, requerirRol } from '../middleware/auth';
 import * as servicio from '../services/afiliados';
+import * as servicioPagos from '../services/pagos';
 import { aCamel, serializar } from '../../shared/casing';
 import {
   afiliadoActualizacionSchema,
@@ -21,6 +22,10 @@ import {
   afiliadoSchema,
   retiroSchema,
 } from '../../shared/afiliados';
+import {
+  historialPagosQuerySchema,
+  historialPagosSchema,
+} from '../../shared/pagos';
 import { respuestasError } from '../../shared/errores';
 import {
   decodificarCursor,
@@ -80,6 +85,27 @@ const rutaActualizar = createRoute({
   responses: {
     200: { description: 'Afiliado actualizado', content: { 'application/json': { schema: afiliadoSchema } } },
     ...respuestasError(400, 401, 404, 409, 422),
+  },
+});
+
+/**
+ * Historial de pagos del afiliado (QASpec Unidad 2): SOLO sus líneas, con el
+ * mes que cubren y el monto que le corresponde a este nadador.
+ */
+const rutaHistorial = createRoute({
+  method: 'get',
+  path: '/api/v1/afiliados/{id}/pagos',
+  summary: 'Historial de pagos de un afiliado (con sus líneas y meses)',
+  description:
+    'Devuelve los últimos pagos que incluyen a este nadador, con SUS líneas (fecha_cobertura = mes ' +
+    'cubierto) y su porción del monto. Los rechazados quedan fuera: sus líneas se liberaron (§8.1.5).',
+  request: { params: idParams, query: historialPagosQuerySchema },
+  responses: {
+    200: {
+      description: 'Pagos del afiliado con sus líneas',
+      content: { 'application/json': { schema: historialPagosSchema } },
+    },
+    ...respuestasError(400, 401, 404),
   },
 });
 
@@ -145,6 +171,12 @@ rutasAfiliados.openapi(rutaActualizar, async (c) => {
     aCamel(c.req.valid('json')),
   );
   return c.json(serializar(afiliadoSchema, actualizado), 200);
+});
+
+rutasAfiliados.openapi(rutaHistorial, async (c) => {
+  const q = c.req.valid('query');
+  const datos = await servicioPagos.historialAfiliado(contextoDe(c), c.req.valid('param').id, q.limit);
+  return c.json(serializar(historialPagosSchema, { datos }), 200);
 });
 
 rutasAfiliados.openapi(rutaRetiro, async (c) => {

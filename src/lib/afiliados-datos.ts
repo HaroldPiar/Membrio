@@ -115,6 +115,37 @@ export function conFiltro(
 }
 
 /**
+ * Quita todos los filtros pero CONSERVA el orden activo (QASpec Unidad 3):
+ * «Limpiar filtros» es sobre el criterio de búsqueda, no sobre A-Z/Z-A.
+ */
+export function sinFiltros(filtros: FiltrosAfiliados): FiltrosAfiliados {
+  return { ...FILTROS_INICIALES, orden: filtros.orden, direccion: filtros.direccion };
+}
+
+/**
+ * Catálogo para el SELECT del formulario (QASpec Unidad 6): solo los ítems
+ * ACTIVOS y, en edición, también el que ya tiene el afiliado aunque esté
+ * desactivado — así no se pierde el dato actual y nadie lo elige a ciegas
+ * (el formulario marca ese ítem «(desactivado)»).
+ *
+ * `estaActivo` separa los dos adjetivos del wire: `activo` (planes) y
+ * `activa` (categorías, femenino). Para el filtro de la tabla, el panel de
+ * detalle y el nombre del plan sigue usándose la lista COMPLETA: un plan
+ * desactivado sigue existiendo para quien ya lo tiene.
+ */
+export function catalogoFormulario<T extends { id: string }>(
+  catalogo: readonly T[],
+  estaActivo: (item: T) => boolean,
+  actualId?: string | null,
+): T[] {
+  const activos = catalogo.filter((item) => estaActivo(item));
+  if (!actualId) return activos;
+  if (activos.some((item) => item.id === actualId)) return activos;
+  const actual = catalogo.find((item) => item.id === actualId);
+  return actual ? [...activos, actual] : activos;
+}
+
+/**
  * Clic en un encabezado ordenable: alterna ASC ⇄ DESC del mismo campo, o
  * activa el campo en ASC si estaba ordenado por otro. El cursor vuelve a
  * cero (lo hace el caller con cambiarFiltros).

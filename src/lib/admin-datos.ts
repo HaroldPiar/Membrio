@@ -131,6 +131,19 @@ export function planValores(plan: Plan): ValoresPlan {
   };
 }
 
+/**
+ * Catálogo de planes ordenado: activos primero, inactivos después (QASpec
+ * post-cierre del checklist: el listado de /admin debe leer como el selector
+ * que ofrece el formulario — primero los que se pueden usar). Orden estable
+ * dentro de cada grupo (sort en copia).
+ */
+export function ordenaPlanes<T extends { id: string; activo: boolean }>(
+  planes: readonly T[],
+): T[] {
+  const copia = [...planes];
+  return copia.sort((a, b) => Number(b.activo) - Number(a.activo));
+}
+
 // ---------------------------------------------------------------------------
 // Categorías (alta y edición del nombre)
 // ---------------------------------------------------------------------------

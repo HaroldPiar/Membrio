@@ -5,7 +5,7 @@
  * (que puede liberar líneas) son operaciones multi-tabla SIEMPRE en
  * transacción. El estado de los pagos solo cambia por estas vías.
  */
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 
 import { db } from '../db/client';
 import { pagoDetalle, pagos } from '../db/schema';
@@ -36,6 +36,8 @@ export type PagoNuevo = {
 export type FiltrosPagos = {
   estado?: string | undefined;
   afiliado?: string | undefined;
+  /** Excluye los rechazados (historial del afiliado: ya no ocupan mes, §8.1.5). */
+  sinRechazados?: boolean | undefined;
   /** AAAA-MM-DD sobre created_at. */
   desde?: string | undefined;
   hasta?: string | undefined;
@@ -64,6 +66,7 @@ function finDiaBo(fecha: string): Date {
 function condicionesListado(filtros: FiltrosPagos): (SQL | undefined)[] {
   const condiciones: (SQL | undefined)[] = [];
   if (filtros.estado) condiciones.push(eq(pagos.estado, filtros.estado));
+  if (filtros.sinRechazados) condiciones.push(ne(pagos.estado, 'rechazado'));
   if (filtros.desde) condiciones.push(gte(pagos.createdAt, inicioDiaBo(filtros.desde)));
   if (filtros.hasta) condiciones.push(lte(pagos.createdAt, finDiaBo(filtros.hasta)));
   if (filtros.factura) {
@@ -119,6 +122,30 @@ export async function listarLineas(ctx: ContextoTenant, pagoId: string): Promise
     .from(pagoDetalle)
     .where(and(eq(pagoDetalle.pagoId, pagoId), eq(pagoDetalle.organizacionId, ctx.organizacionId)))
     .orderBy(asc(pagoDetalle.fechaCobertura), asc(pagoDetalle.concepto), asc(pagoDetalle.afiliadoId));
+}
+
+/**
+ * Líneas de UN afiliado dentro de unos pagos (historial del panel, QASpec
+ * Unidad 2): un pago puede cubrir varios nadadores y acá solo interesan las
+ * suyas, con su monto individual. Orden por cobertura: febrero…diciembre.
+ */
+export async function lineasDeAfiliado(
+  ctx: ContextoTenant,
+  pagoIds: string[],
+  afiliadoId: string,
+): Promise<(typeof pagoDetalle.$inferSelect)[]> {
+  if (pagoIds.length === 0) return [];
+  return db
+    .select()
+    .from(pagoDetalle)
+    .where(
+      and(
+        eq(pagoDetalle.organizacionId, ctx.organizacionId),
+        eq(pagoDetalle.afiliadoId, afiliadoId),
+        inArray(pagoDetalle.pagoId, pagoIds),
+      ),
+    )
+    .orderBy(asc(pagoDetalle.fechaCobertura), asc(pagoDetalle.concepto));
 }
 
 /** Crea pago + líneas en UNA transacción. Lanza el error PG original (23503/23505/23514). */

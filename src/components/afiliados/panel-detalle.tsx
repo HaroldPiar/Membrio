@@ -15,6 +15,7 @@ import {
 } from '../../lib/afiliados-datos';
 import { api, procesar } from '../../lib/api';
 import type { Categoria, Eps, Plan } from '../../lib/consultas-afiliados';
+import { etiquetaMesChip, etiquetaMesLarga } from '../../lib/dashboard-datos';
 import { formatearDinero, formatearFecha, formatearInstante } from '../../lib/formato';
 import { useAcudientes, useHistorialPagos } from '../../lib/consultas-afiliados';
 import { ErrorConsulta } from '../ui/error-consulta';
@@ -338,6 +339,36 @@ export function PanelDetalle({
             )}
           </section>
 
+          {/* QASpec Unidad 2: la deuda, separada del historial de pagos. */}
+          <section className="space-y-3">
+            <TituloSeccion>Meses que debe</TituloSeccion>
+            {afiliado.meses_adeudados.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {afiliado.activo
+                  ? 'No tiene meses adeudados al día de hoy.'
+                  : 'Afiliado retirado: su deuda dejó de evaluarse.'}
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Meses exigibles sin pago verificado, calculados hoy (
+                  {afiliado.estado_pago === 'en_mora' ? 'en mora' : 'estado actual'}).
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {afiliado.meses_adeudados.map((mes) => (
+                    <span
+                      key={mes}
+                      title={etiquetaMesLarga(mes)}
+                      className="rounded bg-en-mora-bg px-2 py-0.5 text-xs font-medium text-en-mora-fg"
+                    >
+                      {etiquetaMesChip(mes)}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
           <section className="space-y-3">
             <TituloSeccion>Historial de pagos</TituloSeccion>
             {historial.isError ? (
@@ -349,18 +380,41 @@ export function PanelDetalle({
             ) : (
               <ul className="divide-y divide-border">
                 {historial.data.datos.map((pago) => (
-                    <li key={pago.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <li key={pago.id} className="py-2.5">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium tabular-nums">
-                          {formatearDinero(pago.monto_total)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatearInstante(pago.created_at)}
-                        </p>
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <p className="text-sm font-medium tabular-nums">
+                            {formatearDinero(pago.monto)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatearInstante(pago.created_at)}
+                          </p>
+                        </div>
                       </div>
                       <EstadoVerificacion estado={pago.estado} />
-                    </li>
-                  ))}
+                    </div>
+                    {/* Mes (con año) al que corresponde cada línea de ESTE nadador. */}
+                    <ul className="mt-1.5 space-y-1">
+                      {pago.lineas.map((linea) => (
+                        <li
+                          key={`${linea.concepto}-${linea.fecha_cobertura}`}
+                          className="flex items-center justify-between gap-2 rounded bg-muted px-2 py-1 text-xs"
+                        >
+                          <span className="truncate">
+                            {etiquetaMesChip(linea.fecha_cobertura.slice(0, 7))}
+                            <span className="ml-1.5 text-muted-foreground">
+                              {linea.concepto === 'matricula' ? 'Matrícula' : 'Mensualidad'}
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-medium tabular-nums">
+                            {formatearDinero(linea.monto)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
               </ul>
             )}
           </section>
