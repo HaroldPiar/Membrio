@@ -1,6 +1,11 @@
 # Membrio
 
-API multi-tenant de afiliados y cobros para clubes y academias (primer cliente: Truchas). Este repo contiene la **API Hono + Drizzle (Fases 1–2)** y el **montaje en Astro con los endpoints `/api/v1` de la Fase 3**: sin frontend real todavía, la documentación interactiva vive en `/api/v1/docs`.
+API multi-tenant de afiliados y cobros para clubes y academias (primer cliente: Truchas).
+
+Este repo contiene **dos productos sobre una sola base**:
+
+- **API Hono + Drizzle (Fases 1–2)** con el montaje en Astro (`src/pages/api/[...route].ts`) para los endpoints `/api/v1` de la Fase 3.
+- **Cliente web (Fase 4 del cliente)**: Astro con React islands (login, dashboard, afiliados, pagos, admin) que consume la API con `openapi-fetch`. La documentación interactiva vive en `/api/v1/docs`.
 
 ## Camino rápido
 
@@ -8,7 +13,8 @@ API multi-tenant de afiliados y cobros para clubes y academias (primer cliente: 
 2. Crear `.env` (ver [Variables de entorno](#variables-de-entorno)) — vos completás el `DATABASE_URL`.
 3. Levantar la base: `docker compose up -d` y luego `pnpm db:migrate && pnpm db:seed`
 4. Levantar la API: `pnpm dev:api` → <http://localhost:3000>
-5. Abrir la docs: <http://localhost:3000/api/v1/docs> y correr el [flujo completo](#flujo-completo-con-curl).
+5. Levantar el cliente: `pnpm dev` → <http://localhost:4321>
+6. Abrir la docs: <http://localhost:3000/api/v1/docs> y correr el [flujo completo](#flujo-completo-con-curl).
 
 Verificación esperada: `pnpm db:verify` imprime `25/25 verificaciones OK`.
 
@@ -49,8 +55,10 @@ Si cambiás `src/server/db/schema.ts`: `pnpm db:generate` y después `pnpm db:sc
 | Comando | Qué hace |
 |---------|----------|
 | `pnpm dev:api` | API standalone en <http://localhost:3000> **sin Astro** (ideal para probar y desarrollar). |
-| `pnpm dev` | Astro en <http://localhost:4321> (primer arranque en frío puede tardar ~1 min); la API cuelga de `/api/v1/*` vía `src/pages/api/[...route].ts`. |
+| `pnpm dev` | Astro en <http://localhost:4321> (primer arranque en frío puede tardar ~40s); la API cuelga de `/api/v1/*` vía `src/pages/api/[...route].ts`. |
 | `pnpm build` / `pnpm preview` | Build SSR de Astro (adaptador `@astrojs/node`, modo standalone). |
+
+Smoke de build standalone: `PORT=4399 node --env-file-if-exists=.env dist/server/entry.mjs`.
 
 La documentación OpenAPI 3.1 + Swagger UI está en:
 
@@ -115,26 +123,26 @@ curl -s $BASE/api/v1/dashboard/recaudo -H "$AUTH"
 | Comando | Cobertura | Esperado |
 |---------|-----------|----------|
 | `pnpm typecheck` | `tsc --noEmit` estricto | sin errores |
-| `pnpm test` | unitarias: estado de pago, validación de pagos, casing | 34/34 |
-| `pnpm test:integracion` | aislamiento entre dos organizaciones (requiere DB + seed) | 6/6 |
-| `pnpm verify:fase2` | smoke offline de la Fase 2 (sin DB) | 20/20 |
-| `pnpm db:verify` | constraints de la base | 25/25 |
+| `pnpm test` | unitarias: estado de pago, validación de pagos, afiliados, dashboard, admin, formato | **164/164** |
+| `pnpm test:integracion` | aislamiento entre dos organizaciones, cookie/CSRF, `?q=`, reglas de pagos/afiliados, orden de afiliados, `?activo=false`, historial por afiliado | **34/34** (requiere DB + seed) |
+| `pnpm verify:fase2` | smoke offline de la Fase 2 (sin DB) | **20/20** |
+| `pnpm db:verify` | constraints de la base | **25/25** |
 
 ## Estructura
 
 ```
 src/
-  server/
-    app.ts            # app Hono (exportada independiente de Astro)
-    routes/           # capa HTTP: Zod + respuestas OpenAPI, sin lógica
-    services/         # reglas de negocio y transacciones
-    repositories/     # único lugar que toca Drizzle (contexto del tenant)
-    middleware/       # auth (JWT), contexto {usuarioId, organizacionId, rol}
-    storage/          # StorageProvider: AlmacenLocal firmado + stub Supabase
-    db/               # schema.ts (fuente de verdad), client.ts, migraciones
-    config/           # env.ts (validación Zod), constantes de negocio
-  shared/             # esquemas Zod wire (snake_case) usados por API y futuro front
-  pages/api/[...route].ts   # montaje de la app Hono en Astro
+  server/           # app Hono (src/server/app.ts), routes/, services/, repositories/,
+                   # middleware/, storage/, db/, config/  + db schema/migrations
+  shared/            # esquemas Zod wire (snake_case) usados por API y cliente
+  pages/             # api/[...route].ts (montaje Hono en Astro) + páginas del cliente
+    api/[...route].ts
+    afiliados.astro, pagos.astro, pagos/nuevo.astro, admin.astro, index.astro, login.astro
+  components/        # React islands del cliente (ui/, layout/, dashboard/, afiliados/, pagos/, admin/)
+  layouts/           # AppLayout.astro, AuthLayout.astro
+  lib/               # cliente: api.ts, consultas-*.ts, *-datos.ts (capas puras), sesion.ts, tema.ts, formato.ts, tipos-api.ts
+  styles/            # global.css, graficos.css (tokens de estado para Recharts)
+  middleware.ts      # protección de rutas del cliente
 tests/{unit,integracion}/
 Specs/                # specs de producto y plan de fases (fuente de verdad)
 ```
@@ -148,6 +156,19 @@ Specs/                # specs de producto y plan de fases (fuente de verdad)
 - Bajas lógicas para afiliados (`activo = false`); los pagos se escriben en transacción.
 - Swagger desactivado en `NODE_ENV=production`; `.storage/` (archivos locales) no se commitea.
 
+Invariantes de la ronda QA (ver `Specs/QASpec.md` y `Specs/Spec del cliente.md` §7):
+
+- `?activo` en query se parsea con `z.preprocess` estricto (`'true'`/`'false'` → boolean, resto **400**). `z.coerce.boolean()` está prohibido.
+- `afiliadoSchema` trae **dos** campos calculados, nunca almacenados: `estado_pago` y `meses_adeudados` (`['AAAA-MM']`).
+- Un pago puede cubrir varios nadadores: el historial por afiliado usa `GET /api/v1/afiliados/{id}/pagos` (sus líneas, sin rechazados).
+- En `/pagos` la única query param que controla UI es `?tab=cartera` (decisión 55, leída por `pestanaDeUrl`).
+- El dropdown del filtro usa `position: fixed` (la tabla está en `overflow-x-auto`).
+- El select del formulario recibe `catalogoFormulario` (activos, + el actual en edición marcado).
+
 ## Estado
 
-Fases 1–3 completas: datos + migraciones, auth/errores, y los 22 endpoints de `/api/v1` con documentación, pruebas y montaje Astro. Siguiente hito según `Specs/specplan.md`: frontend Astro (Fase 4) e integración Supabase Auth/Storage.
+Fases 1–3 completas (datos + migraciones, auth/errores, 22 endpoints `/api/v1` con docs, pruebas y montaje Astro) y **Fase 4/5 del cliente completas** (shell/login, dashboard, afiliados, pagos, admin sobre esa API).
+
+**Ronda QA post-Fase 5 (28 oct 2026):** 6 unidades corregidas y cerradas (`Specs/QASpec.md`) con gates en verde — `pnpm typecheck`, `pnpm test` (164), `pnpm test:integracion` (34), `pnpm build` y smoke en `:4399`.
+
+Siguiente hito según `Specs/specplan.md`: integración Supabase Auth/Storage.
