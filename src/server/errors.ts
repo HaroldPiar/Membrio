@@ -17,7 +17,7 @@ import { pgCode } from './db/pg-error';
 import type { RespuestaError } from '../shared/errores';
 
 /** Status que usa la API (subconjunto de los que acepta c.json de Hono). */
-export type StatusApi = 400 | 401 | 403 | 404 | 409 | 422 | 500;
+export type StatusApi = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
 
 export class AppError extends Error {
   constructor(

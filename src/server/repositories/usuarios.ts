@@ -20,6 +20,8 @@ export type UsuarioSesion = {
   correo: string;
   nombre: string;
   activo: boolean;
+  /** Hash scrypt de la contraseña (solo en AUTH_MODE=password; null en dev/seed). */
+  passwordHash: string | null;
   /** nombre del rol ('admin' | 'operador'). */
   rol: string;
 };
@@ -30,6 +32,7 @@ const CON_ROL = {
   correo: usuarios.correo,
   nombre: usuarios.nombre,
   activo: usuarios.activo,
+  passwordHash: usuarios.passwordHash,
   createdAt: usuarios.createdAt,
   updatedAt: usuarios.updatedAt,
   rol: roles.nombre,

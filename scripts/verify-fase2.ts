@@ -31,7 +31,7 @@ function registrar(nombre: string, ok: boolean, detalle?: string): void {
 async function main(): Promise<void> {
   // Imports dinámicos de los módulos que cargan el entorno (ya con defaults seteados).
   const { validarEntorno } = await import('../src/server/config/env');
-  const { firmarTokenDev, verificarTokenSesion } = await import('../src/server/auth/jwt');
+  const { firmarTokenSesion, verificarTokenSesion } = await import('../src/server/auth/jwt');
 
   // -------------------------------------------------------------------------
   // 1. Entorno (función pura; la app llama a validarEntorno al importar)
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------
   // 2. JWT (el proceso corre en modo dev con secreto válido gracias a los defaults)
   // -------------------------------------------------------------------------
-  const token = await firmarTokenDev('usuario-de-prueba');
+  const token = await firmarTokenSesion('usuario-de-prueba');
   try {
     const { usuarioId } = await verificarTokenSesion(token);
     registrar('JWT roundtrip: firma → verifica el mismo sub', usuarioId === 'usuario-de-prueba', `sub: ${usuarioId}`);

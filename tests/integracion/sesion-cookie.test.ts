@@ -13,7 +13,12 @@
  * Requiere la base local levantada y con seed. Se corre con
  * `pnpm test:integracion`.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// Estos tests ejercitan el flujo de dev-login: fijar el modo activo.
+vi.hoisted(() => {
+  process.env.AUTH_MODE = 'dev';
+});
 
 import { app } from '../../src/server/app';
 import { sqlClient } from '../../src/server/db/client';

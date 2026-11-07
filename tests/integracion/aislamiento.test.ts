@@ -10,7 +10,11 @@
  * Convención de errores: recurso ajeno → 404 (nunca 403); referencia inválida
  * en creación (FK compuesta) → 422 REFERENCIA_INVALIDA.
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  process.env.AUTH_MODE = 'dev';
+});
 import { eq, inArray } from 'drizzle-orm';
 
 import { app } from '../../src/server/app';

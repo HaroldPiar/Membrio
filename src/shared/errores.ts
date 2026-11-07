@@ -8,7 +8,8 @@
  *    PERMISO_INSUFICIENTE (403), NO_ENCONTRADO (404),
  *    DUPLICADO (409), REFERENCIA_INVALIDA (422), RESTRICCION_VIOLADA (422),
  *    DATO_OBLIGATORIO (422), RUTA_NO_ENCONTRADA (404),
- *    CREDENCIALES_INVALIDAS (401), ERROR_INTERNO (500).
+ *    CREDENCIALES_INVALIDAS (401), ERROR_INTERNO (500),
+ *    DEMASIADOS_INTENTOS (429 — rate limit de intentos de login fallidos).
  */
 import { z } from '@hono/zod-openapi';
 
@@ -34,7 +35,7 @@ export const respuestaErrorSchema = z
   })
   .openapi('Error');
 
-type StatusConError = 400 | 401 | 403 | 404 | 409 | 422 | 500;
+type StatusConError = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500;
 
 const DESCRIPCIONES: Record<StatusConError, string> = {
   400: 'Validación: datos de entrada inválidos',
@@ -43,6 +44,7 @@ const DESCRIPCIONES: Record<StatusConError, string> = {
   404: 'Recurso inexistente (incluye recursos de otra organización)',
   409: 'Conflicto: registro duplicado o transición de estado no permitida',
   422: 'Violación de integridad o reglas de la base',
+  429: 'Rate limit: demasiados intentos fallidos de inicio de sesión',
   500: 'Error interno sin detalles técnicos',
 };
 

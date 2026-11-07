@@ -165,3 +165,4 @@ ALTER TABLE "afiliados" ADD CONSTRAINT "afiliados_numero_documento_format_check"
 ALTER TABLE "pagos" ADD COLUMN "factura_tipo_documento" text DEFAULT 'CC' NOT NULL;
 ALTER TABLE "pagos" ADD CONSTRAINT "pagos_factura_tipo_documento_check" CHECK ("pagos"."factura_tipo_documento" in ('TI', 'CC', 'RC', 'PAS', 'PPT', 'NIT'));
 ALTER TABLE "pagos" ADD CONSTRAINT "pagos_factura_documento_check" CHECK ("pagos"."factura_documento" ~ '^[A-Z0-9-]+$' and ("pagos"."factura_tipo_documento" not in ('CC', 'TI') or "pagos"."factura_documento" ~ '^[0-9]+$'));
+ALTER TABLE "usuarios" ADD COLUMN "password_hash" text;

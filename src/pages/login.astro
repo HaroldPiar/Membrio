@@ -2,7 +2,9 @@
 import { SelectorTema } from '../components/layout/selector-tema';
 import { LoginForm } from '../components/ui/login-form';
 import AuthLayout from '../layouts/AuthLayout.astro';
+import { entorno } from '@/server/config/env';
 ---
+
 <AuthLayout titulo="Iniciar sesión">
   <main class="relative flex min-h-screen flex-col items-center justify-center gap-4 p-4">
     <!-- Selector de tema también en /login (QASpec Unidad 5): la preferencia
@@ -11,7 +13,7 @@ import AuthLayout from '../layouts/AuthLayout.astro';
       <SelectorTema client:load compacto />
     </div>
     <div class="w-full max-w-sm">
-      <LoginForm client:load />
+      <LoginForm client:load modo={entorno.AUTH_MODE} />
     </div>
     <p class="text-center text-xs text-muted-foreground">
       Membrio · afiliados y cobros de tu club

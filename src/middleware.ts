@@ -24,12 +24,20 @@ const RUTAS_PROTEGIDAS: readonly RegExp[] = [
   /^\/admin(\/|$)/,
 ];
 
+function secretoSesion(): string | undefined {
+  switch (process.env.AUTH_MODE) {
+    case 'password':
+      return process.env.SESSION_JWT_SECRET;
+    case 'supabase':
+      return process.env.SUPABASE_JWT_SECRET;
+    default:
+      return process.env.DEV_JWT_SECRET;
+  }
+}
+
 async function haySesionValida(token: string): Promise<boolean> {
   try {
-    const secreto =
-      process.env.AUTH_MODE === 'supabase'
-        ? process.env.SUPABASE_JWT_SECRET
-        : process.env.DEV_JWT_SECRET;
+    const secreto = secretoSesion();
     if (!secreto) return false;
     await jwtVerify(token, new TextEncoder().encode(secreto), {
       algorithms: ['HS256'],

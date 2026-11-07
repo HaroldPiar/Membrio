@@ -69,6 +69,7 @@ export const usuarios = pgTable(
     correo: text('correo').notNull().unique(),
     nombre: text('nombre').notNull(),
     activo: boolean('activo').notNull().default(true),
+    passwordHash: text('password_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

@@ -12,7 +12,11 @@
  * documento comparan igual en cualquier collación (solo dígitos).
  */
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  process.env.AUTH_MODE = 'dev';
+});
 import { eq, inArray } from 'drizzle-orm';
 
 import { app } from '../../src/server/app';

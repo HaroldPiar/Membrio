@@ -120,6 +120,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inicia sesión con correo y contraseña (SOLO AUTH_MODE=password)
+         * @description Credenciales propias (correo + contraseña). Correo inexistente, inactivo o contraseña incorrecta responden 401 idéntico CREDENCIALES_INVALIDAS. Además del token en el body, fija la cookie httpOnly membrio_session (Path=/, SameSite=Lax, Max-Age = expiración del JWT, Secure en producción). Rate limit: 5 intentos fallidos por (correo + IP) cada 15 min → 429 DEMASIADOS_INTENTOS; un login exitoso reinicia el contador.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        correo: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Sesión iniciada */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Sesion"];
+                    };
+                };
+                /** @description Validación: datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sesión ausente, inválida o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit: demasiados intentos fallidos de inicio de sesión */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;

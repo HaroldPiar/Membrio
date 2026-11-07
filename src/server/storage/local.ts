@@ -27,9 +27,14 @@ const DURACION_SUBIDA_SEG = 15 * 60; // 15 min para subir
 const DURACION_LECTURA_SEG = 5 * 60; // 5 min para leer (corta duración, §10)
 
 function secreto(): string {
-  // Asegurado por config/env.ts: en modo dev existe DEV_JWT_SECRET (>=32);
-  // en modo supabase existe SUPABASE_JWT_SECRET.
-  const clave = entorno.DEV_JWT_SECRET ?? entorno.SUPABASE_JWT_SECRET;
+  // Asegurado por config/env.ts: en modo dev existe DEV_JWT_SECRET (>=32), en
+  // modo password SESSION_JWT_SECRET y en modo supabase SUPABASE_JWT_SECRET.
+  const clave =
+    entorno.AUTH_MODE === 'password'
+      ? entorno.SESSION_JWT_SECRET
+      : entorno.AUTH_MODE === 'dev'
+        ? entorno.DEV_JWT_SECRET
+        : entorno.SUPABASE_JWT_SECRET;
   if (!clave) throw new AppError(500, 'ERROR_INTERNO', 'Sin secreto para firmar archivos');
   return clave;
 }

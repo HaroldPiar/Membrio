@@ -1,7 +1,8 @@
 /**
- * Sesiones JWT (HS256) para el modo dev y para la fase preparada de Supabase.
+ * Sesiones JWT (HS256) para los modos propios de inicio de sesión.
  *
- *  - AUTH_MODE=dev:     se firma con DEV_JWT_SECRET (solo existe POST /auth/dev-login).
+ *  - AUTH_MODE=dev:      se firma con DEV_JWT_SECRET (solo POST /auth/dev-login).
+ *  - AUTH_MODE=password: se firma con SESSION_JWT_SECRET (POST /auth/login).
  *  - AUTH_MODE=supabase: se VERIFICA con SUPABASE_JWT_SECRET (preparado, sin probar).
  *    Cuando Supabase entre de verdad, la cookie httpOnly la manejará @supabase/ssr
  *    y aquí solo quedará la verificación del access token.
@@ -20,11 +21,23 @@ const DURACION_HORAS = 12;
 
 const aBytes = (secreto: string): Uint8Array => new TextEncoder().encode(secreto);
 
-/** Firma un token de sesión (solo se usa en modo dev). */
-export async function firmarTokenDev(usuarioId: string): Promise<string> {
-  if (entorno.AUTH_MODE !== 'dev') {
-    throw new Error('firmarTokenDev solo existe en AUTH_MODE=dev');
+/** Secreto que firma/verifica en el modo activo (dev → DEV_JWT_SECRET; password → SESSION_JWT_SECRET). */
+function secretoJwt(): string {
+  if (entorno.AUTH_MODE === 'dev') {
+    return entorno.DEV_JWT_SECRET as string;
   }
+  if (entorno.AUTH_MODE === 'password') {
+    return entorno.SESSION_JWT_SECRET as string;
+  }
+  return entorno.SUPABASE_JWT_SECRET as string;
+}
+
+/** Firma un token de sesión (solo en los modos propios: dev o password). */
+export async function firmarTokenSesion(usuarioId: string): Promise<string> {
+  if (entorno.AUTH_MODE !== 'dev' && entorno.AUTH_MODE !== 'password') {
+    throw new Error('firmarTokenSesion solo puede usarse en AUTH_MODE=dev o AUTH_MODE=password');
+  }
+  const secreto = entorno.AUTH_MODE === 'dev' ? (entorno.DEV_JWT_SECRET as string) : (entorno.SESSION_JWT_SECRET as string);
   return new SignJWT({})
     .setProtectedHeader({ alg: ALGORITMO })
     .setSubject(usuarioId)
@@ -32,7 +45,7 @@ export async function firmarTokenDev(usuarioId: string): Promise<string> {
     .setAudience(AUDIENCE)
     .setIssuedAt()
     .setExpirationTime(`${DURACION_HORAS}h`)
-    .sign(aBytes(entorno.DEV_JWT_SECRET as string));
+    .sign(aBytes(secreto));
 }
 
 /**
@@ -40,8 +53,7 @@ export async function firmarTokenDev(usuarioId: string): Promise<string> {
  * Lanza si el token es inválido, está vencido o tiene otro secreto/issuer.
  */
 export async function verificarTokenSesion(token: string): Promise<{ usuarioId: string }> {
-  const secreto = entorno.AUTH_MODE === 'dev' ? entorno.DEV_JWT_SECRET : entorno.SUPABASE_JWT_SECRET;
-  const { payload } = await jwtVerify(token, aBytes(secreto as string), {
+  const { payload } = await jwtVerify(token, aBytes(secretoJwt()), {
     algorithms: [ALGORITMO],
     issuer: ISSUER,
     audience: AUDIENCE,
