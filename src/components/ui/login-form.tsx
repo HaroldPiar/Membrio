@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { api } from '../../lib/api';
+import { destinoTrasLogin } from '../../lib/rutas-sesion';
 import {
   inicioSesionPasswordSchema,
   inicioSesionSchema,
@@ -27,6 +28,7 @@ import {
   type InicioSesionPassword,
 } from '../../shared/sesion';
 import { Boton } from './boton';
+import { CampoPassword } from './campo-password';
 import { CampoTexto } from './campo-texto';
 import { Etiqueta } from './etiqueta';
 import { Tarjeta, TarjetaContenido, TarjetaEncabezado, TarjetaTitulo } from './tarjeta';
@@ -45,9 +47,9 @@ function LoginDev() {
   const enviar = handleSubmit(async (datos) => {
     setAviso(null);
     try {
-      const { response } = await api.POST('/api/v1/auth/dev-login', { body: datos });
-      if (response.ok) {
-        window.location.assign('/');
+      const { data } = await api.POST('/api/v1/auth/dev-login', { body: datos });
+      if (data) {
+        window.location.assign(destinoTrasLogin(data.usuario));
         return;
       }
       setAviso('No se pudo iniciar sesión. Revisa el correo e inténtalo de nuevo.');
@@ -113,9 +115,9 @@ function LoginPassword() {
   const enviar = handleSubmit(async (datos) => {
     setAviso(null);
     try {
-      const { response } = await api.POST('/api/v1/auth/login', { body: datos });
-      if (response.ok) {
-        window.location.assign('/');
+      const { response, data } = await api.POST('/api/v1/auth/login', { body: datos });
+      if (data) {
+        window.location.assign(destinoTrasLogin(data.usuario));
         return;
       }
       const cuerpo = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
@@ -156,9 +158,8 @@ function LoginPassword() {
           </div>
           <div className="space-y-2">
             <Etiqueta htmlFor="password">Contraseña</Etiqueta>
-            <CampoTexto
+            <CampoPassword
               id="password"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••••••"
               aria-invalid={errors.password ? true : undefined}

@@ -7,7 +7,11 @@
  *     sigue existiendo para Swagger y los curl).
  *  2. Verificación del JWT según AUTH_MODE (ver auth/jwt.ts).
  *  3. Búsqueda del usuario en `usuarios`: si NO existe o activo=false se
- *     rechaza 401 aunque el token sea válido (spec §5).
+ *     rechaza 401 aunque el token sea válido (spec §5). El claim `ph` (huella
+ *     del hash de contraseña) debe coincidir con la fila: cualquier cambio o
+ *     restablecimiento invalida los tokens anteriores, incluso en el mismo
+ *     segundo (el `iat` solo tiene granularidad de segundos y queda como
+ *     defensa adicional).
  *  4. El contexto { usuarioId, organizacionId, rol } se arma SOLO de esa fila:
  *     organizacion_id NUNCA viene del body, la URL ni los query params.
  *  5. Si la autenticación fue POR COOKIE y el método es mutante, se exige
@@ -20,6 +24,7 @@ import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 
 import { verificarTokenSesion } from '../auth/jwt';
+import { huellaPassword } from '../auth/password';
 import { AppError } from '../errors';
 import { obtenerUsuarioPorId } from '../repositories/usuarios';
 import { rechazarCsrf, type OrigenToken } from './csrf';
@@ -63,8 +68,10 @@ export const requerirAuth = createMiddleware<EnvAplicacion>(async (c, next) => {
   }
 
   let usuarioId: string;
+  let emitidoEn: number;
+  let huella: string | undefined;
   try {
-    ({ usuarioId } = await verificarTokenSesion(token));
+    ({ usuarioId, iat: emitidoEn, huella } = await verificarTokenSesion(token));
   } catch {
     // Token inválido, vencido o firmado con otro secreto: misma respuesta.
     throw new AppError(401, 'SESION_INVALIDA', 'Token inválido o expirado');
@@ -74,6 +81,35 @@ export const requerirAuth = createMiddleware<EnvAplicacion>(async (c, next) => {
   if (!usuario || !usuario.activo) {
     // Usuario inactivo (dado de baja) se rechaza aunque el JWT sea válido.
     throw new AppError(401, 'USUARIO_INACTIVO', 'Usuario inactivo o inexistente');
+  }
+
+  // Invalidación fuerte por cambio/restablecimiento de contraseña: el token
+  // lleva la huella `ph` del hash con el que se emitió. Si el hash actual tiene
+  // otra huella, el token es anterior al cambio (un token sin `ph` también cae
+  // aquí: obliga a re-loguear tras desplegar esta versión).
+  if (huella !== huellaPassword(usuario.passwordHash)) {
+    throw new AppError(401, 'SESION_INVALIDA', 'Token inválido o expirado');
+  }
+
+  // Invalidación por tiempo (defensa adicional): un token emitido ANTES de
+  // password_changed_at deja de valer (iat en segundos; la igualdad se acepta
+  // y la huella de arriba es la que cubre el mismo segundo).
+  if (usuario.passwordChangedAt) {
+    const cambiadoEnSegundos = Math.floor(usuario.passwordChangedAt.getTime() / 1000);
+    if (emitidoEn < cambiadoEnSegundos) {
+      throw new AppError(401, 'SESION_INVALIDA', 'Token inválido o expirado');
+    }
+  }
+
+  // Bloqueo por política de cambio de contraseña (task): la API es la fuente de
+  // verdad y lee el flag desde la base. Se eximen /api/v1/me (lectura), el cambio
+  // de contraseña y el logout, que son parte del flujo obligatorio.
+  const ruta = c.req.path;
+  const esExenta =
+    (c.req.method === 'POST' && (ruta === '/api/v1/auth/cambio-password' || ruta === '/api/v1/auth/logout')) ||
+    (c.req.method === 'GET' && ruta === '/api/v1/me');
+  if (usuario.debeCambiarPassword && !esExenta) {
+    throw new AppError(403, 'CAMBIO_PASSWORD_REQUERIDO', 'Debe cambiar su contraseña antes de continuar');
   }
 
   // Defensa CSRF (spec del cliente §6): cookie + método mutante exige origen propio.

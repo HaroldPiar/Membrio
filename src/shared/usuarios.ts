@@ -19,6 +19,10 @@ export const usuarioSchema = z
     nombre: z.string().openapi({ example: 'María Pérez' }),
     rol: rolSchema,
     activo: z.boolean(),
+    debe_cambiar_password: z.boolean().openapi({
+      description: 'true mientras el usuario debe cambiar su contraseña (admin le asignó una temporal)',
+      example: false,
+    }),
     created_at: instante,
     updated_at: instante,
   })
@@ -39,3 +43,18 @@ export const usuarioActualizacionSchema = z
     activo: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Debe enviar al menos un campo' });
+
+/** Respuesta del alta de usuario: la temporal se devuelve UNA sola vez. */
+export const respuestaCrearUsuarioSchema = z
+  .object({
+    usuario: usuarioSchema,
+    contrasena_temporal: z.string().openapi({ example: 'Xk8fPq2mWv7Rb4Nh' }),
+  })
+  .openapi('RespuestaCrearUsuario');
+
+/** Respuesta del restablecimiento de contraseña: la temporal se devuelve UNA sola vez. */
+export const respuestaRestablecerPasswordSchema = z
+  .object({
+    contrasena_temporal: z.string().openapi({ example: 'Xk8fPq2mWv7Rb4Nh' }),
+  })
+  .openapi('RespuestaRestablecerPassword');

@@ -38,3 +38,21 @@ export const inicioSesionPasswordSchema = z.object({
 });
 
 export type InicioSesionPassword = z.infer<typeof inicioSesionPasswordSchema>;
+
+/**
+ * Cambio de contraseña self-service (task: admin asigna temporal → usuario
+ * cambia). Espejo del `esquemaCambioPassword` en src/server/routes/auth.ts:
+ * política 12–128 y nueva distinta de la actual (validada en el handler).
+ */
+export const cambioContrasenaSchema = z.object({
+  contrasena_actual: z
+    .string()
+    .min(12, { message: 'La contraseña debe tener al menos 12 caracteres' })
+    .max(128, { message: 'La contraseña debe tener hasta 128 caracteres' }),
+  contrasena_nueva: z
+    .string()
+    .min(12, { message: 'La contraseña debe tener al menos 12 caracteres' })
+    .max(128, { message: 'La contraseña debe tener hasta 128 caracteres' }),
+});
+
+export type CambioContrasena = z.infer<typeof cambioContrasenaSchema>;

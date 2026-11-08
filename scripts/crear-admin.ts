@@ -2,7 +2,10 @@
  * Crea (o actualiza la contraseña de) un usuario administrador en una
  * organización existente.
  *
- * Uso:   pnpm db:crear-admin <correo> <nombre> <slug-organizacion>
+ * Uso:   pnpm db:crear-admin <correo> <nombre> <slug-organizacion> [rol]
+ *
+ * - El rol es opcional: `admin` (default) o `operador`. Solo se usa en el alta
+ *   de un usuario nuevo (en el update idempotente el rol NO cambia).
  *
  * - La contraseña se pide SIN ECO (con confirmación) desde la terminal, o se
  *   toma de ADMIN_PASSWORD si no hay terminal interactiva. NUNCA por argumento.
@@ -63,9 +66,14 @@ function leerContrasena(mensaje: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const [correoCrudo, nombreCrudo, slug] = process.argv.slice(2);
+  const [correoCrudo, nombreCrudo, slug, rolCrudo] = process.argv.slice(2);
   if (!correoCrudo || !nombreCrudo || !slug) {
-    throw new Error('Uso: pnpm db:crear-admin <correo> <nombre> <slug-organizacion>');
+    throw new Error('Uso: pnpm db:crear-admin <correo> <nombre> <slug-organizacion> [rol]');
+  }
+  // Rol opcional: admin (default) o operador. En el alta define el rol inicial.
+  const rol = rolCrudo?.trim().toLowerCase() === 'operador' ? 'operador' : 'admin';
+  if (rolCrudo && rolCrudo.trim().toLowerCase() !== 'admin' && rolCrudo.trim().toLowerCase() !== 'operador') {
+    throw new Error('Rol inválido: debe ser admin o operador.');
   }
   // Mismo criterio que el login: el correo se guarda en minúsculas.
   const correo = correoCrudo.trim().toLowerCase();
@@ -95,8 +103,8 @@ async function main(): Promise<void> {
     .limit(1);
   if (!org) throw new Error(`Organización no encontrada: ${slug}`);
 
-  const [rol] = await db.select({ id: roles.id }).from(roles).where(eq(roles.nombre, 'admin')).limit(1);
-  if (!rol) throw new Error('Rol admin no encontrado');
+  const [rolFila] = await db.select({ id: roles.id }).from(roles).where(eq(roles.nombre, rol)).limit(1);
+  if (!rolFila) throw new Error(`Rol no encontrado: ${rol}`);
 
   const existente = await db
     .select({ id: usuarios.id })
@@ -107,7 +115,14 @@ async function main(): Promise<void> {
   if (existente.length > 0) {
     await db
       .update(usuarios)
-      .set({ nombre, passwordHash: hashPassword(contrasena) })
+      .set({
+        nombre,
+        passwordHash: hashPassword(contrasena),
+        // La contraseña la eligió la persona (no es temporal): sin cambio forzado,
+        // y los JWT emitidos antes de este cambio dejan de valer.
+        debeCambiarPassword: false,
+        passwordChangedAt: new Date(),
+      })
       .where(eq(usuarios.correo, correo));
     console.log(`Contraseña actualizada para ${correo}.`);
     return;
@@ -115,13 +130,14 @@ async function main(): Promise<void> {
 
   await db.insert(usuarios).values({
     organizacionId: org.id,
-    rolId: rol.id,
+    rolId: rolFila.id,
     correo,
     nombre,
     activo: true,
     passwordHash: hashPassword(contrasena),
+    debeCambiarPassword: false,
   });
-  console.log(`Usuario admin creado: ${correo} (organización ${slug}).`);
+  console.log(`Usuario ${rol} creado: ${correo} (organización ${slug}).`);
 }
 
 main()

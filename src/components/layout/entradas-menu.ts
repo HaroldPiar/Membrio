@@ -22,8 +22,16 @@ export const entradasMenu: readonly EntradaMenu[] = [
 /**
  * El menú se oculta por rol, pero no es la seguridad: la API responde 403
  * (Spec del cliente §3.1). Rol desconocido/no-admin nunca ve Administración.
+ *
+ * `bloqueado` (debe_cambiar_password activo): no se pinta NINGÚN módulo; el
+ * cambio de contraseña es lo único accesible y vive en el pie ("Cambiar
+ * contraseña"), no como entrada del menú.
  */
-export function entradasParaRol(rol: string | undefined): readonly EntradaMenu[] {
+export function entradasParaRol(
+  rol: string | undefined,
+  opciones: { bloqueado?: boolean | undefined } = {},
+): readonly EntradaMenu[] {
+  if (opciones.bloqueado) return [];
   return entradasMenu.filter((entrada) => !entrada.soloAdmin || rol === 'admin');
 }
 

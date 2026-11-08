@@ -11,6 +11,8 @@ import * as servicio from '../services/catalogos';
 import { serializar } from '../../shared/casing';
 import { respuestasError } from '../../shared/errores';
 import {
+  respuestaCrearUsuarioSchema,
+  respuestaRestablecerPasswordSchema,
   usuarioActualizacionSchema,
   usuarioCreacionSchema,
   usuarioSchema,
@@ -52,7 +54,10 @@ const rutaCrear = createRoute({
     body: { content: { 'application/json': { schema: usuarioCreacionSchema } }, required: true },
   },
   responses: {
-    201: { description: 'Usuario creado', content: { 'application/json': { schema: usuarioSchema } } },
+    201: {
+      description: 'Usuario creado: devuelve la contraseña temporal UNA sola vez (Cache-Control: no-store)',
+      content: { 'application/json': { schema: respuestaCrearUsuarioSchema } },
+    },
     ...respuestasError(400, 401, 403, 409, 422),
   },
 });
@@ -96,6 +101,21 @@ const rutaDesactivar = createRoute({
   },
 });
 
+const rutaRestablecerPassword = createRoute({
+  method: 'post',
+  path: '/api/v1/usuarios/{id}/restablecer-password',
+  summary: 'Restablece la contraseña de un usuario con una temporal (solo admin)',
+  ...soloAdmin,
+  request: { params: idParams },
+  responses: {
+    200: {
+      description: 'Contraseña temporal generada: se devuelve UNA sola vez (Cache-Control: no-store)',
+      content: { 'application/json': { schema: respuestaRestablecerPasswordSchema } },
+    },
+    ...respuestasError(400, 401, 403, 404, 409),
+  },
+});
+
 export const rutasUsuarios = new OpenAPIHono<EnvAplicacion>();
 
 rutasUsuarios.use('/api/v1/usuarios/*', requerirAuth);
@@ -112,7 +132,15 @@ rutasUsuarios.openapi(rutaListar, async (c) => {
 
 rutasUsuarios.openapi(rutaCrear, async (c) => {
   const creado = await servicio.crearUsuario(contextoDe(c), c.req.valid('json'));
-  return c.json(serializar(usuarioSchema, creado), 201);
+  // La temporal se entrega SOLO en esta respuesta (y nunca se persiste en cache).
+  c.header('Cache-Control', 'no-store');
+  return c.json(
+    serializar(respuestaCrearUsuarioSchema, {
+      usuario: creado.usuario,
+      contrasena_temporal: creado.contrasenaTemporal,
+    }),
+    201,
+  );
 });
 
 rutasUsuarios.openapi(rutaObtener, async (c) => {
@@ -132,4 +160,10 @@ rutasUsuarios.openapi(rutaActualizar, async (c) => {
 rutasUsuarios.openapi(rutaDesactivar, async (c) => {
   const usuario = await servicio.desactivarUsuario(contextoDe(c), c.req.valid('param').id);
   return c.json(serializar(usuarioSchema, usuario), 200);
+});
+
+rutasUsuarios.openapi(rutaRestablecerPassword, async (c) => {
+  const temporal = await servicio.restablecerPassword(contextoDe(c), c.req.valid('param').id);
+  c.header('Cache-Control', 'no-store');
+  return c.json(serializar(respuestaRestablecerPasswordSchema, { contrasena_temporal: temporal }), 200);
 });

@@ -13,6 +13,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 
 import { entorno } from '../config/env';
+import { huellaPassword } from './password';
 
 const ALGORITMO = 'HS256';
 const ISSUER = 'membrio';
@@ -33,14 +34,22 @@ function secretoJwt(): string {
 }
 
 /** Firma un token de sesión (solo en los modos propios: dev o password). */
-export async function firmarTokenSesion(usuarioId: string): Promise<string> {
+export async function firmarTokenSesion(
+  usuarioId: string,
+  opciones?: { dcp?: boolean; passwordHash?: string | null },
+): Promise<string> {
   if (entorno.AUTH_MODE !== 'dev' && entorno.AUTH_MODE !== 'password') {
     throw new Error('firmarTokenSesion solo puede usarse en AUTH_MODE=dev o AUTH_MODE=password');
   }
   const secreto = entorno.AUTH_MODE === 'dev' ? (entorno.DEV_JWT_SECRET as string) : (entorno.SESSION_JWT_SECRET as string);
-  return new SignJWT({})
+  return new SignJWT({
+    sub: usuarioId,
+    dcp: Boolean(opciones?.dcp),
+    // Huella del hash vigente: si cambia (cambio/restablecimiento) este token
+    // deja de valer aunque su `iat` sea del mismo segundo que el cambio.
+    ph: huellaPassword(opciones?.passwordHash),
+  })
     .setProtectedHeader({ alg: ALGORITMO })
-    .setSubject(usuarioId)
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
@@ -49,10 +58,14 @@ export async function firmarTokenSesion(usuarioId: string): Promise<string> {
 }
 
 /**
- * Verifica un token de sesión según el modo activo y devuelve el usuario.
- * Lanza si el token es inválido, está vencido o tiene otro secreto/issuer.
+ * Verifica un token de sesión según el modo activo y devuelve el usuario, su
+ * `iat` (Unix seconds) y la huella `ph` del hash de contraseña con la que se
+ * emitió. El caller compara ambos contra la fila actual para invalidar
+ * sesiones anteriores a un cambio de contraseña.
  */
-export async function verificarTokenSesion(token: string): Promise<{ usuarioId: string }> {
+export async function verificarTokenSesion(
+  token: string,
+): Promise<{ usuarioId: string; iat: number; huella: string | undefined }> {
   const { payload } = await jwtVerify(token, aBytes(secretoJwt()), {
     algorithms: [ALGORITMO],
     issuer: ISSUER,
@@ -61,7 +74,11 @@ export async function verificarTokenSesion(token: string): Promise<{ usuarioId: 
   if (!payload.sub) {
     throw new Error('Token sin subject (sub)');
   }
-  return { usuarioId: payload.sub };
+  return {
+    usuarioId: payload.sub,
+    iat: typeof payload.iat === 'number' ? payload.iat : 0,
+    huella: typeof payload.ph === 'string' ? payload.ph : undefined,
+  };
 }
 
 /** Expiración en segundos del token, para devolverla en el login (i/exp). */

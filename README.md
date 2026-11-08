@@ -33,8 +33,9 @@ Verificación esperada: `pnpm db:verify` imprime `25/25 verificaciones OK`.
 | Variable | Obligatoria | Descripción |
 |----------|-------------|-------------|
 | `DATABASE_URL` | sí | Conexión a Postgres local. Debe apuntar al compose (`puerto 5433`, base `membrio_prueba` — ver `docker-compose.yml`). **Nunca se genera ni se commitea.** |
-| `AUTH_MODE` | no | `dev` (default) o `supabase`. En producción solo se acepta `supabase`. |
+| `AUTH_MODE` | no | `dev` (default), `password` (login propio correo + contraseña) o `supabase`. En producción se aceptan `password` o `supabase`; `dev` se rechaza. |
 | `DEV_JWT_SECRET` | en `dev` | Secreto de al menos 32 caracteres. Generalo vos (p. ej. `openssl rand -base64 48`). |
+| `SESSION_JWT_SECRET` | con `password` | Secreto de al menos 32 caracteres para firmar los JWT del login propio. |
 | `SUPABASE_JWT_SECRET` | con `supabase` | Secreto del proyecto Supabase. |
 
 La validación es **al importar la app**: un `.env` inválido hace que el proceso arranque con error (por diseño).
@@ -49,6 +50,17 @@ pnpm db:verify              # 25 checks de constraints (sale con 1 si falla)
 ```
 
 Si cambiás `src/server/db/schema.ts`: `pnpm db:generate` y después `pnpm db:schema-sql` (regenera `membrio_schema.sql`, no se edita a mano).
+
+## Gestión de usuarios (`AUTH_MODE=password`)
+
+- **Alta:** el admin la hace en `/admin` → Usuarios. El sistema genera una contraseña temporal de 16 caracteres (sin caracteres ambiguos) y la muestra **una sola vez** en un diálogo copiable; no se envía por correo ni se vuelve a mostrar.
+- **Restablecimiento:** el admin puede generar una temporal nueva desde la fila del usuario (mismo diálogo de una sola vez).
+- **Cambio obligatorio:** al entrar con la temporal el cliente va **directo** a `/cambiar-password` (sin pasar por el dashboard) y el menú lateral oculta todos los módulos: no hay botón de cambio de contraseña en la barra, solo el aviso y «Cerrar sesión». Mientras el flag `debe_cambiar_password` esté activo la API responde `403 CAMBIO_PASSWORD_REQUERIDO` en todo salvo `GET /api/v1/me`, `POST /api/v1/auth/cambio-password` y `POST /api/v1/auth/logout`. Los campos de contraseña tienen botón para mostrar/ocultar.
+- **Invalidación:** cambiar o restablecer la contraseña actualiza `password_changed_at`; los JWT emitidos antes responden `401` (la comparación fuerte es la huella `ph` del hash, que cubre incluso el mismo segundo).
+- **Salvaguardas:** un admin no puede desactivarse ni quitarse el rol admin, y la organización no puede quedar sin ningún admin activo.
+- **Bootstrap:** el primer admin se crea con `pnpm db:crear-admin <correo> <nombre> <slug> [admin|operador]` (rol `admin` por defecto).
+
+No hay envío de correos ni recuperación automática todavía: la temporal se la pasa el admin al usuario por fuera del sistema (decisión §7 del Spec del cliente).
 
 ## Levantar el servidor
 
@@ -65,7 +77,7 @@ La documentación OpenAPI 3.1 + Swagger UI está en:
 - <http://localhost:3000/api/v1/docs> (o `:4321/api/v1/docs` con Astro)
 - <http://localhost:3000/api/v1/openapi.json>
 
-Solo existe cuando `NODE_ENV !== 'production'`. El esquema global es Bearer JWT; `dev-login` está declarado como ruta pública.
+Solo existe cuando `NODE_ENV !== 'production'`. El esquema global es Bearer JWT; `dev-login` y `login` están declarados como rutas públicas (en runtime se monta solo la del `AUTH_MODE` activo).
 
 ## Flujo completo con curl
 
@@ -117,6 +129,8 @@ curl -s $BASE/api/v1/dashboard/resumen -H "$AUTH"
 curl -s $BASE/api/v1/dashboard/morosidad -H "$AUTH"
 curl -s $BASE/api/v1/dashboard/recaudo -H "$AUTH"
 ```
+
+Con `AUTH_MODE=password` el paso 1 cambia: `POST /api/v1/auth/login` con `{"correo","password"}`. Si el usuario tiene `debe_cambiar_password` activo, solo puede llamar a `/me`, `/auth/cambio-password` y `/auth/logout` hasta cambiarla (ver [Gestión de usuarios](#gestión-de-usuarios-auth_modepassword)).
 
 ## Pruebas y verificación
 

@@ -9,6 +9,13 @@
  * de navegación, no seguridad. La seguridad real vive en la API (requerirAuth
  * revalida token Y usuario activo en cada petición).
  *
+ * Task (gestión de usuarios en producción): mientras el usuario tenga el flag
+ * `debe_cambiar_password` activo (claim informativo `dcp: true` en el JWT,
+ * firmado por el backend según la base) se le redirige desde cualquier página
+ * protegida hacia `/cambiar-password`, que es la única ruta adicional permitida.
+ * Al cambiar la contraseña el backend emite un JWT con `dcp: false` y este
+ * middleware lo refleja redirigiendo a `/`.
+ *
  * ¿Por qué no importar src/server/middleware/auth? Porque el cliente jamás
  * importa de src/server (restricción de estructura); esta verificación queda
  * en el glue de Astro. Decisión anotada en el Spec del cliente §7.
@@ -16,29 +23,20 @@
 import { defineMiddleware } from 'astro:middleware';
 import { jwtVerify } from 'jose';
 
+import { seleccionarSecretoSesion } from './lib/secreto-sesion';
+
 const COOKIE_SESION = 'membrio_session';
 const RUTAS_PROTEGIDAS: readonly RegExp[] = [
   /^\/$/,
   /^\/afiliados(\/|$)/,
   /^\/pagos(\/|$)/,
   /^\/admin(\/|$)/,
+  /^\/cambiar-password(\/|$)/,
 ];
 
-function secretoSesion(): string | undefined {
-  switch (process.env.AUTH_MODE) {
-    case 'password':
-      return process.env.SESSION_JWT_SECRET;
-    case 'supabase':
-      return process.env.SUPABASE_JWT_SECRET;
-    default:
-      return process.env.DEV_JWT_SECRET;
-  }
-}
-
-async function haySesionValida(token: string): Promise<boolean> {
+async function haySesionValida(token: string, secreto: string | undefined): Promise<boolean> {
+  if (!secreto) return false;
   try {
-    const secreto = secretoSesion();
-    if (!secreto) return false;
     await jwtVerify(token, new TextEncoder().encode(secreto), {
       algorithms: ['HS256'],
       issuer: 'membrio',
@@ -50,18 +48,53 @@ async function haySesionValida(token: string): Promise<boolean> {
   }
 }
 
+/** Claim informativo `dcp` (debe cambiar password) del token; false si no decodifica. */
+async function decodificarDebeCambiar(token: string, secreto: string | undefined): Promise<boolean> {
+  if (!secreto) return false;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secreto), {
+      algorithms: ['HS256'],
+      issuer: 'membrio',
+      audience: 'membrio-api',
+    });
+    return typeof payload.dcp === 'boolean' ? payload.dcp : false;
+  } catch {
+    return false;
+  }
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const ruta = context.url.pathname;
   if (ruta.startsWith('/api/')) return next();
 
   const protegida = RUTAS_PROTEGIDAS.some((expresion) => expresion.test(ruta));
   const esLogin = ruta === '/login';
+  const esRutaCambioPassword = ruta === '/cambiar-password';
   if (!protegida && !esLogin) return next();
 
   const token = context.cookies.get(COOKIE_SESION)?.value;
-  const valido = token ? await haySesionValida(token) : false;
+  const secreto = seleccionarSecretoSesion({
+    authMode: process.env.AUTH_MODE,
+    devJwtSecret: process.env.DEV_JWT_SECRET,
+    sessionJwtSecret: process.env.SESSION_JWT_SECRET,
+    supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET,
+  });
+  const valido = token ? await haySesionValida(token, secreto) : false;
 
   if (protegida && !valido) return context.redirect('/login');
+
+  if (protegida) {
+    const dcp = token ? await decodificarDebeCambiar(token, secreto) : false;
+    // Mientras debe cambiar contraseña, toda página protegida (salvo
+    // /cambiar-password) redirige al cambio; con el flag en false,
+    // /cambiar-password → '/'.
+    if (dcp) {
+      if (!esRutaCambioPassword) return context.redirect('/cambiar-password');
+    } else if (esRutaCambioPassword) {
+      return context.redirect('/');
+    }
+  }
+
   if (esLogin && valido) return context.redirect('/');
   return next();
 });

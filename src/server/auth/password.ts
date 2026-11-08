@@ -10,7 +10,7 @@
  * Política de contraseña (misma en API y en el script de admin): 12 a 128
  * caracteres (el máximo evita abuso de CPU en scrypt).
  */
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const ALGORITMO = 'scrypt';
 const KEYLEN = 64;
@@ -56,4 +56,37 @@ export function verificarPassword(contrasena: string, hash: string | null | unde
 /** Valida la política de contraseña: 12 a 128 caracteres. */
 export function esContrasenaValida(contrasena: string): boolean {
   return contrasena.length >= 12 && contrasena.length <= 128;
+}
+
+const CARACTERES_TEMPORALES = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const LONGITUD_TEMPORAL = 16;
+
+/**
+ * Genera una contraseña temporal de 16 caracteres (alfabeto sin caracteres
+ * ambiguos: sin 0/O, 1/l/I) que cumple la política 12–128. Se usa para el alta
+ * de usuario admin y el restablecimiento; se entrega UNA sola vez.
+ */
+export function generarContrasenaTemporal(): string {
+  let resultado = '';
+  for (let i = 0; i < LONGITUD_TEMPORAL; i += 1) {
+    resultado += CARACTERES_TEMPORALES[randomInt(0, CARACTERES_TEMPORALES.length)];
+  }
+  return resultado;
+}
+
+/**
+ * Huella estable y no reversible del hash de contraseña, para el claim `ph`
+ * del JWT. El `iat` solo tiene granularidad de segundos, así que un token
+ * emitido en el mismo segundo que un cambio/restablecimiento seguiría siendo
+ * válido; comparar esta huella contra el hash actual cierra ese hueco: si el
+ * hash cambió, la huella cambia y el token deja de valer.
+ *
+ * Se trunca a 16 hex (suficiente para detectar cambios accidentales o
+ * provocados) y NUNCA expone el hash scrypt almacenado en la base.
+ */
+export function huellaPassword(hash: string | null | undefined): string {
+  return createHash('sha256')
+    .update(hash ?? 'sin-password')
+    .digest('hex')
+    .slice(0, 16);
 }

@@ -63,7 +63,9 @@ function ContenidoBarra({ rutaActual }: { rutaActual: string }) {
     });
   };
 
-  const entradas = entradasParaRol(usuario?.rol);
+  const entradas = entradasParaRol(usuario?.rol, {
+    bloqueado: usuario?.debe_cambiar_password,
+  });
   const iniciales =inicialesDe(usuario?.nombre);
 
   return (
@@ -120,7 +122,12 @@ function ContenidoBarra({ rutaActual }: { rutaActual: string }) {
               ))}
             </ul>
           )}
-          {usuario && (
+          {usuario && entradas.length === 0 && (
+            <p className="px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              Cambia tu contraseña para desbloquear el resto de módulos.
+            </p>
+          )}
+          {usuario && entradas.length > 0 && (
             <ul className="space-y-1">
               {entradas.map((entrada) => {
                 const Icono = ICONOS[entrada.icono];

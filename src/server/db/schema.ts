@@ -70,6 +70,10 @@ export const usuarios = pgTable(
     nombre: text('nombre').notNull(),
     activo: boolean('activo').notNull().default(true),
     passwordHash: text('password_hash'),
+    /** true mientras el usuario debe cambiar su contraseña (admin le asignó una temporal). */
+    debeCambiarPassword: boolean('debe_cambiar_password').notNull().default(false),
+    /** Marca temporal: al cambiar/restablecer se cierra la sesión con iat anterior. (Sin .notNull() → nullable) */
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

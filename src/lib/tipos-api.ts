@@ -57,6 +57,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/cambio-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cambia la contraseña del usuario autenticado (self-service)
+         * @description Requiere sesión. Body: { contrasena_actual, contrasena_nueva } con política 12–128 y nueva distinta de la actual. Verifica la actual, actualiza el hash, limpia `debe_cambiar_password`, actualiza `password_changed_at` y emite un JWT nuevo (con claim informativo `dcp: false`) que reemplaza la cookie. La sesión previa queda inválida por comparación `iat < password_changed_at` → 401. Rate limit: 5 intentos fallidos por usuario / 15 min → 429 DEMASIADOS_INTENTOS.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        contrasena_actual: string;
+                        contrasena_nueva: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Contraseña actualizada: sesión renovada */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Sesion"];
+                    };
+                };
+                /** @description Validación: datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sesión ausente, inválida o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rol insuficiente para la operación */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limit: demasiados intentos fallidos de inicio de sesión */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/dev-login": {
         parameters: {
             query?: never;
@@ -331,13 +413,13 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Usuario creado */
+                /** @description Usuario creado: devuelve la contraseña temporal UNA sola vez (Cache-Control: no-store) */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Usuario"];
+                        "application/json": components["schemas"]["RespuestaCrearUsuario"];
                     };
                 };
                 /** @description Validación: datos de entrada inválidos */
@@ -621,6 +703,89 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/usuarios/{id}/restablecer-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restablece la contraseña de un usuario con una temporal (solo admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Contraseña temporal generada: se devuelve UNA sola vez (Cache-Control: no-store) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RespuestaRestablecerPassword"];
+                    };
+                };
+                /** @description Validación: datos de entrada inválidos */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sesión ausente, inválida o usuario inactivo */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rol insuficiente para la operación */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Recurso inexistente (incluye recursos de otra organización) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicto: registro duplicado o transición de estado no permitida */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/planes": {
@@ -2699,6 +2864,11 @@ export interface components {
                 rol: string;
                 /** Format: uuid */
                 organizacion_id: string;
+                /**
+                 * @description true mientras el usuario debe cambiar su contraseña: el cliente lo lleva a /cambiar-password
+                 * @example false
+                 */
+                debe_cambiar_password: boolean;
             };
         };
         Me: {
@@ -2711,6 +2881,11 @@ export interface components {
             rol: string;
             /** Format: uuid */
             organizacion_id: string;
+            /**
+             * @description true mientras el usuario debe cambiar su contraseña (admin le asignó una temporal)
+             * @example false
+             */
+            debe_cambiar_password: boolean;
         };
         Usuario: {
             /**
@@ -2733,6 +2908,11 @@ export interface components {
             rol: "admin" | "operador";
             activo: boolean;
             /**
+             * @description true mientras el usuario debe cambiar su contraseña (admin le asignó una temporal)
+             * @example false
+             */
+            debe_cambiar_password: boolean;
+            /**
              * Format: date-time
              * @example 2026-02-15T10:30:00.000Z
              */
@@ -2742,6 +2922,11 @@ export interface components {
              * @example 2026-02-15T10:30:00.000Z
              */
             updated_at: string;
+        };
+        RespuestaCrearUsuario: {
+            usuario: components["schemas"]["Usuario"];
+            /** @example Xk8fPq2mWv7Rb4Nh */
+            contrasena_temporal: string;
         };
         UsuarioCreacion: {
             /**
@@ -2756,6 +2941,10 @@ export interface components {
              * @enum {string}
              */
             rol: "admin" | "operador";
+        };
+        RespuestaRestablecerPassword: {
+            /** @example Xk8fPq2mWv7Rb4Nh */
+            contrasena_temporal: string;
         };
         Plan: {
             /**

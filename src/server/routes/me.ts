@@ -19,6 +19,10 @@ const meSchema = z
     nombre: z.string(),
     rol: z.string().openapi({ example: 'admin' }),
     organizacion_id: z.uuid(),
+    debe_cambiar_password: z.boolean().openapi({
+      description: 'true mientras el usuario debe cambiar su contraseña (admin le asignó una temporal)',
+      example: false,
+    }),
   })
   .openapi('Me');
 

@@ -97,6 +97,14 @@ API en Vercel (Astro endpoints + Hono)
 
 La matriz se aplica con un middleware `requireRole(...)` por ruta. Es una decisión inicial, ajustable cuando se conozcan los perfiles reales de Truchas.
 
+### Gestión de contraseñas con `AUTH_MODE=password` (adición)
+
+Sin registro público ni envío de correos en el MVP: el alta y el restablecimiento los hace un admin desde el panel del cliente. El servidor genera una **contraseña temporal** (16 caracteres, alfabeto sin ambiguos `0/O/1/l/I`, con `node:crypto`) y la devuelve **una sola vez** con `Cache-Control: no-store`; el admin se la entrega al usuario por fuera del sistema. Toda alta o restablecimiento marca `debe_cambiar_password = true` y actualiza `password_changed_at`.
+
+Mientras el flag esté activo, la API responde `403 CAMBIO_PASSWORD_REQUERIDO` en toda ruta salvo `GET /api/v1/me`, `POST /api/v1/auth/cambio-password` y `POST /api/v1/auth/logout`. El cambio exige la contraseña actual, aplica la política 12–128, rechaza que la nueva sea igual a la actual y limita a 5 fallos por usuario cada 15 minutos (`429`). La invalidación de sesiones es fuerte: cada JWT incluye el claim `ph` (huella truncada del hash vigente) que la API compara con la fila, de modo que cualquier cambio o restablecimiento invalida los tokens anteriores aunque se hayan emitido en el mismo segundo; `iat < password_changed_at` se conserva como defensa adicional. Al desplegar esta versión, los tokens anteriores (sin `ph`) dejan de valer y piden re-login. El middleware de Astro usa el claim informativo `dcp` solo para redirigir a `/cambiar-password`; la seguridad la aplica la API.
+
+El login con contraseña usa scrypt (`node:crypto`, sin dependencias nuevas) y tiene dos limitadores: 5 fallos/15 min por correo + IP y 10 fallos/15 min por correo (ambos `429 DEMASIADOS_INTENTOS`). Salvaguardas: un admin no puede desactivarse ni quitarse el rol admin, y la organización no puede quedar sin ningún admin activo.
+
 ## 5. Multi-tenancy
 
 **Modelo:** base de datos compartida, esquema compartido, discriminador `organizacion_id`.

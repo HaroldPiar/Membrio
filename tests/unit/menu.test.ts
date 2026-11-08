@@ -23,6 +23,18 @@ describe('entradasParaRol', () => {
     expect(rutas).not.toContain('/admin');
   });
 
+  it('"Cambiar contraseña" no es una entrada del menú (vive en el pie)', () => {
+    for (const rol of [undefined, 'admin', 'operador']) {
+      expect(entradasParaRol(rol).map((e) => e.ruta)).not.toContain('/cambiar-password');
+    }
+  });
+
+  it('con el cambio de contraseña pendiente no hay ningún módulo', () => {
+    for (const rol of [undefined, 'admin', 'operador']) {
+      expect(entradasParaRol(rol, { bloqueado: true })).toHaveLength(0);
+    }
+  });
+
   it('rol desconocido o ausente nunca ve entradas solo-admin', () => {
     for (const rol of [undefined, '', 'invitado', 'ADMIN', 'superadmin']) {
       expect(entradasParaRol(rol).some((e) => e.soloAdmin)).toBe(false);

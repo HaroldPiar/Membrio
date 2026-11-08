@@ -12,6 +12,7 @@ import * as reposCategorias from '../repositories/categorias';
 import * as reposEps from '../repositories/eps';
 import * as reposPlanes from '../repositories/planes';
 import * as reposUsuarios from '../repositories/usuarios';
+import { generarContrasenaTemporal, hashPassword } from '../auth/password';
 import type { Cursor } from '../../shared/paginacion';
 import type { Opcionales } from '../../shared/casing';
 
@@ -125,18 +126,49 @@ export async function obtenerUsuario(ctx: ContextoTenant, id: string) {
 export async function crearUsuario(
   ctx: ContextoTenant,
   datos: { correo: string; nombre: string; rol: string },
-) {
+): Promise<{ usuario: Awaited<ReturnType<typeof obtenerUsuario>>; contrasenaTemporal: string }> {
   const rolId = await reposUsuarios.obtenerRolPorNombre(datos.rol);
   if (rolId === undefined) {
     throw new AppError(422, 'REFERENCIA_INVALIDA', `Rol desconocido: ${datos.rol}`);
   }
+  // Alta con password temporal: el admin no elige la contrasena; el sistema la
+  // genera y se entrega UNA sola vez. El usuario debe cambiarla (flag en true).
+  const contrasenaTemporal = generarContrasenaTemporal();
+  const hash = hashPassword(contrasenaTemporal);
+  const ahora = new Date();
   const [usuario] = await reposUsuarios.crearUsuario(ctx, {
     correo: datos.correo,
     nombre: datos.nombre,
     rolId,
+    passwordHash: hash,
+    debeCambiarPassword: true,
+    passwordChangedAt: ahora,
   });
   if (!usuario) throw new AppError(500, 'ERROR_INTERNO', 'No se pudo crear el usuario');
-  return obtenerUsuario(ctx, usuario.id);
+  const creado = await obtenerUsuario(ctx, usuario.id);
+  if (!creado) throw new AppError(500, 'ERROR_INTERNO', 'No se pudo crear el usuario');
+  return { usuario: creado, contrasenaTemporal };
+}
+
+/**
+ * Restablece la contraseña de un usuario (admin): genera una temporal, guarda el
+ * hash, marca debe_cambiar_password y actualiza password_changed_at; devuelve la
+ * temporal UNA sola vez. Cierra de facto las sesiones previas del usuario (el
+ * caller invalida por iat contra password_changed_at).
+ */
+export async function restablecerPassword(ctx: ContextoTenant, id: string): Promise<string> {
+  const usuario = await obtenerUsuario(ctx, id);
+  if (!usuario) throw new AppError(404, 'NO_ENCONTRADO', 'Usuario no encontrado');
+  const contrasenaTemporal = generarContrasenaTemporal();
+  const hash = hashPassword(contrasenaTemporal);
+  const ahora = new Date();
+  const [actualizado] = await reposUsuarios.actualizarPasswordDeUsuario(ctx, id, {
+    passwordHash: hash,
+    debeCambiarPassword: true,
+    passwordChangedAt: ahora,
+  });
+  if (!actualizado) throw new AppError(500, 'ERROR_INTERNO', 'No se pudo actualizar la contraseña');
+  return contrasenaTemporal;
 }
 
 export async function actualizarUsuario(
@@ -145,10 +177,25 @@ export async function actualizarUsuario(
   parcial: { nombre?: string | undefined; rol?: string | undefined; activo?: boolean | undefined },
 ) {
   // Existe en el tenant → 404 antes de cualquier escritura.
-  await obtenerUsuario(ctx, id);
+  const usuarioActual = await obtenerUsuario(ctx, id);
+  if (!usuarioActual) throw noEncontrado('Usuario');
   // Autodesactivación prohibida: dejaría la organización sin admins.
   if (parcial.activo === false && id === ctx.usuarioId) {
     throw new AppError(409, 'ESTADO_INVALIDO', 'No puede desactivar su propia cuenta');
+  }
+  // No se puede quitar el rol admin a sí mismo (autodegradarse a operador).
+  if (parcial.rol === 'operador' && id === ctx.usuarioId) {
+    throw new AppError(409, 'ESTADO_INVALIDO', 'No puede quitarse el rol admin a sí mismo');
+  }
+  // No se puede dejar la organización sin ningún admin activo.
+  if (parcial.activo === false || parcial.rol === 'operador') {
+    const eraAdminActivo = usuarioActual.rol === 'admin' && usuarioActual.activo;
+    if (eraAdminActivo) {
+      const otrosAdminsActivos = await reposUsuarios.contarOtrosAdminsActivos(ctx, id);
+      if (otrosAdminsActivos === 0) {
+        throw new AppError(409, 'ESTADO_INVALIDO', 'No puede dejar la organización sin ningún admin activo');
+      }
+    }
   }
   let rolId: number | undefined;
   if (parcial.rol !== undefined) {

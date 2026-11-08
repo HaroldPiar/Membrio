@@ -166,3 +166,5 @@ ALTER TABLE "pagos" ADD COLUMN "factura_tipo_documento" text DEFAULT 'CC' NOT NU
 ALTER TABLE "pagos" ADD CONSTRAINT "pagos_factura_tipo_documento_check" CHECK ("pagos"."factura_tipo_documento" in ('TI', 'CC', 'RC', 'PAS', 'PPT', 'NIT'));
 ALTER TABLE "pagos" ADD CONSTRAINT "pagos_factura_documento_check" CHECK ("pagos"."factura_documento" ~ '^[A-Z0-9-]+$' and ("pagos"."factura_tipo_documento" not in ('CC', 'TI') or "pagos"."factura_documento" ~ '^[0-9]+$'));
 ALTER TABLE "usuarios" ADD COLUMN "password_hash" text;
+ALTER TABLE "usuarios" ADD COLUMN "debe_cambiar_password" boolean DEFAULT false NOT NULL;
+ALTER TABLE "usuarios" ADD COLUMN "password_changed_at" timestamp with time zone;

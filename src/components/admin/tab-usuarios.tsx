@@ -46,7 +46,16 @@ function EsqueletoListado() {
 }
 
 /** Alta de usuario (correo, nombre y rol) — esquema de la capa pura. */
-function FormularioUsuario({ onCancelar, onListo }: { onCancelar: () => void; onListo: () => void }) {
+function FormularioUsuario({
+  onCancelar,
+  onListo,
+  onCrear,
+}: {
+  onCancelar: () => void;
+  onListo: () => void;
+  /** Recibe la temporal generada (se entrega UNA sola vez). */
+  onCrear: (titulo: string, contrasenaTemporal: string) => void;
+}) {
   const queryClient = useQueryClient();
   const [aviso, setAviso] = useState<string | null>(null);
   const {
@@ -61,7 +70,10 @@ function FormularioUsuario({ onCancelar, onListo }: { onCancelar: () => void; on
   const enviar = handleSubmit(async (datos) => {
     setAviso(null);
     try {
-      await procesar(api.POST('/api/v1/usuarios', { body: datos }));
+      const creado = await procesar(api.POST('/api/v1/usuarios', { body: datos }));
+      // La temporal se entrega UNA sola vez: la mostramos y nunca se guarda en
+      // estado de caché del cliente.
+      onCrear(`Contraseña temporal para ${creado.usuario.correo}`, creado.contrasena_temporal);
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
       onListo();
     } catch (error) {
@@ -132,8 +144,11 @@ export function TabUsuarios() {
   const sesion = useSesion();
   const [creando, setCreando] = useState(false);
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [resetId, setResetId] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [temporal, setTemporal] = useState<{ titulo: string; contrasenaTemporal: string } | null>(null);
+  const [copiada, setCopiada] = useState(false);
 
   const refrescar = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin'] });
@@ -183,6 +198,26 @@ export function TabUsuarios() {
     }
   };
 
+  const restablecer = async (usuario: Usuario) => {
+    setAviso(null);
+    setOcupado(usuario.id);
+    try {
+      const respuesta = await procesar(
+        api.POST('/api/v1/usuarios/{id}/restablecer-password', {
+          params: { path: { id: usuario.id } },
+        }),
+      );
+      setCopiada(false);
+      setTemporal({ titulo: `Contraseña temporal para ${usuario.correo}`, contrasenaTemporal: respuesta.contrasena_temporal });
+      setResetId(null);
+    } catch (error) {
+      setAviso(avisoDeError(error, 'No se pudo restablecer la contraseña.'));
+    } finally {
+      await refrescar();
+      setOcupado(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -204,7 +239,15 @@ export function TabUsuarios() {
       )}
 
       {creando && (
-        <FormularioUsuario onCancelar={() => setCreando(false)} onListo={() => setCreando(false)} />
+        <FormularioUsuario
+          onCancelar={() => setCreando(false)}
+          onListo={() => setCreando(false)}
+          onCrear={(titulo, contrasenaTemporal) => {
+            setCopiada(false);
+            setTemporal({ titulo, contrasenaTemporal });
+            setCreando(false);
+          }}
+        />
       )}
 
       {usuarios.isError ? (
@@ -278,24 +321,37 @@ export function TabUsuarios() {
                     <td className="px-3 py-2.5 text-right">
                       {esPropio ? (
                         <span className="text-xs text-muted-foreground">—</span>
-                      ) : usuario.activo ? (
-                        <Boton
-                          variante="borde"
-                          tamano="chico"
-                          disabled={ocupado === usuario.id}
-                          onClick={() => setConfirmando(enConfirmando ? null : usuario.id)}
-                        >
-                          Desactivar
-                        </Boton>
                       ) : (
-                        <Boton
-                          variante="borde"
-                          tamano="chico"
-                          disabled={ocupado === usuario.id}
-                          onClick={() => void cambiarActivo(usuario, true)}
-                        >
-                          Reactivar
-                        </Boton>
+                        <>
+                          {usuario.activo && (
+                            <Boton
+                              variante="borde"
+                              tamano="chico"
+                              disabled={ocupado === usuario.id}
+                              onClick={() => setConfirmando(enConfirmando ? null : usuario.id)}
+                            >
+                              Desactivar
+                            </Boton>
+                          )}
+                          {!usuario.activo && (
+                            <Boton
+                              variante="borde"
+                              tamano="chico"
+                              disabled={ocupado === usuario.id}
+                              onClick={() => void cambiarActivo(usuario, true)}
+                            >
+                              Reactivar
+                            </Boton>
+                          )}
+                          <Boton
+                            variante="borde"
+                            tamano="chico"
+                            disabled={ocupado === usuario.id}
+                            onClick={() => setResetId(usuario.id)}
+                          >
+                            Restablecer contraseña
+                          </Boton>
+                        </>
                       )}
                     </td>
                     </tr>
@@ -327,11 +383,75 @@ export function TabUsuarios() {
                         </td>
                       </tr>
                     )}
+                    {resetId === usuario.id && (
+                      <tr className="border-b border-border bg-muted/40 last:border-b-0">
+                        <td colSpan={5} className="px-3 py-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm">
+                              Se generará una contraseña temporal para {usuario.nombre} ({usuario.correo})
+                              que deberá cambiar al ingresar. Podrás copiarla para pasársela por fuera del
+                              sistema.
+                            </p>
+                            <div className="flex gap-2">
+                              <Boton
+                                tamano="chico"
+                                disabled={ocupado === usuario.id}
+                                onClick={() => void restablecer(usuario)}
+                              >
+                                Generar temporal
+                              </Boton>
+                              <Boton
+                                variante="fantasma"
+                                tamano="chico"
+                                onClick={() => setResetId(null)}
+                              >
+                                Cancelar
+                              </Boton>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {temporal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Tarjeta className="w-full max-w-md">
+            <TarjetaEncabezado>
+              <TarjetaTitulo>Contraseña temporal</TarjetaTitulo>
+              <p className="text-sm text-muted-foreground">{temporal.titulo}. Se entregó una sola vez.</p>
+            </TarjetaEncabezado>
+            <TarjetaContenido className="space-y-4">
+              <div className="flex items-center gap-2 rounded-md border bg-muted p-3">
+                <code className="min-w-0 flex-1 break-all font-mono text-sm">{temporal.contrasenaTemporal}</code>
+                <Boton
+                  tamano="chico"
+                  onClick={() =>
+                    void (async () => {
+                      try {
+                        await navigator.clipboard.writeText(temporal.contrasenaTemporal);
+                        setCopiada(true);
+                      } catch {
+                        // sin clipboard: el admin copia manualmente
+                      }
+                    })()
+                  }
+                >
+                  {copiada ? 'Copiada' : 'Copiar'}
+                </Boton>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                No se volverá a mostrar. El usuario deberá cambiarla al ingresar.
+              </p>
+              <Boton onClick={() => { setTemporal(null); setCopiada(false); }}>Entendido</Boton>
+            </TarjetaContenido>
+          </Tarjeta>
         </div>
       )}
     </div>
